@@ -2,6 +2,7 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import morgan from "morgan";
+import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 
 import routes from "./routes/index.js";
@@ -22,15 +23,21 @@ export function createApp() {
     }),
   );
 
-  // CORS allowlist. Requests with no Origin (curl, same-origin) are permitted.
+  // CORS allowlist. When credentials are used, reflect the explicit origin.
   app.use(
     cors({
       origin(origin, callback) {
-        // Allow requests with no Origin (curl, same-origin, health checks) and
-        // any origin on the allowlist. Deny others gracefully (no CORS headers)
-        // rather than throwing, so the browser blocks them without a 500.
-        callback(null, !origin || CORS_ALLOWED_ORIGINS.includes(origin));
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+        if (CORS_ALLOWED_ORIGINS.includes(origin)) {
+          callback(null, origin);
+          return;
+        }
+        callback(null, false);
       },
+      credentials: true,
       methods: ["GET", "POST", "OPTIONS"],
       exposedHeaders: ["Content-Disposition", "X-Filename"],
       maxAge: 86400,
@@ -43,6 +50,7 @@ export function createApp() {
 
   app.use(express.json({ limit: "5mb" }));
   app.use(express.urlencoded({ extended: false, limit: "5mb" }));
+  app.use(cookieParser());
 
   // Rate limiting on the API surface.
   app.use(

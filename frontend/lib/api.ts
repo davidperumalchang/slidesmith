@@ -1,4 +1,5 @@
 import type {
+  AuthUser,
   LookupResponse,
   LyricsPreviewResponse,
   Pastor,
@@ -9,8 +10,16 @@ import type {
 } from "./types";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:4000/api";
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "/backend-api";
+
+function redirectToLogin() {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === "/login") return;
+  const next = `${window.location.pathname}${window.location.search}`;
+  const params = new URLSearchParams();
+  if (next && next !== "/") params.set("next", next);
+  window.location.assign(`/login${params.size ? `?${params}` : ""}`);
+}
 
 async function parseError(res: Response): Promise<string> {
   try {
@@ -32,13 +41,59 @@ async function parseError(res: Response): Promise<string> {
   return `Request failed with status ${res.status}`;
 }
 
+async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+    credentials: "include",
+  });
+
+  if (res.status === 401 && !path.startsWith("/auth/login")) {
+    redirectToLogin();
+  }
+
+  return res;
+}
+
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as T;
 }
 
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+export async function login(email: string, password: string): Promise<AuthUser> {
+  const res = await apiFetch("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await json<{ user: AuthUser }>(res);
+  return data.user;
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await apiFetch("/auth/logout", { method: "POST" });
+  } catch {
+    /* still clear client navigation */
+  }
+}
+
+export async function getMe(): Promise<AuthUser | null> {
+  const res = await apiFetch("/auth/me");
+  if (res.status === 401) return null;
+  const data = await json<{ user: AuthUser }>(res);
+  return data.user;
+}
+
+// ---------------------------------------------------------------------------
+// App API
+// ---------------------------------------------------------------------------
 export async function getPastors(): Promise<Pastor[]> {
-  const res = await fetch(`${API_BASE_URL}/pastors`);
+  const res = await apiFetch("/pastors");
   const data = await json<{ pastors: Pastor[] }>(res);
   return data.pastors;
 }
@@ -46,7 +101,7 @@ export async function getPastors(): Promise<Pastor[]> {
 export async function extractVerses(file: File): Promise<VerseExtractResponse> {
   const form = new FormData();
   form.append("document", file);
-  const res = await fetch(`${API_BASE_URL}/verses/extract`, {
+  const res = await apiFetch("/verses/extract", {
     method: "POST",
     body: form,
   });
@@ -59,7 +114,7 @@ export async function lookupPassages(params: {
   source?: "offline" | "online";
   version?: string;
 }): Promise<LookupResponse> {
-  const res = await fetch(`${API_BASE_URL}/passages/lookup`, {
+  const res = await apiFetch("/passages/lookup", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
@@ -68,7 +123,7 @@ export async function lookupPassages(params: {
 }
 
 export async function validateLyrics(content: string): Promise<ValidateResponse> {
-  const res = await fetch(`${API_BASE_URL}/lyrics/validate`, {
+  const res = await apiFetch("/lyrics/validate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content }),
@@ -81,7 +136,7 @@ export async function previewLyrics(
   format: "ppt" | "pp7",
   useTheme = false,
 ): Promise<LyricsPreviewResponse> {
-  const res = await fetch(`${API_BASE_URL}/lyrics/preview`, {
+  const res = await apiFetch("/lyrics/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content, format, useTheme }),
@@ -96,7 +151,7 @@ export async function previewSermon(params: {
   sermonTitle?: string;
   useTheme?: boolean;
 }): Promise<SermonPreviewResponse> {
-  const res = await fetch(`${API_BASE_URL}/sermon/preview`, {
+  const res = await apiFetch("/sermon/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
@@ -138,12 +193,11 @@ function triggerBrowserDownload(blob: Blob, filename: string) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  // Revoke shortly after to let the download start.
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 async function download(path: string, body: unknown, fallbackName: string): Promise<string> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await apiFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

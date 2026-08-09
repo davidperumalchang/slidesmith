@@ -12,6 +12,14 @@ export class ApiError extends Error {
     return new ApiError(400, message, details);
   }
 
+  static unauthorized(message = "Authentication required.", details) {
+    return new ApiError(401, message, details);
+  }
+
+  static forbidden(message = "Forbidden.", details) {
+    return new ApiError(403, message, details);
+  }
+
   static notFound(message, details) {
     return new ApiError(404, message, details);
   }

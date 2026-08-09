@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { HomeIcon, MusicIcon, BookIcon } from "./icons";
+import { logout } from "@/lib/api";
 
 type NavItem = {
   href: string;
@@ -83,6 +84,35 @@ function Brand() {
   );
 }
 
+function SignOutButton({ onDone }: { onDone?: () => void }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  const onSignOut = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await logout();
+    } finally {
+      onDone?.();
+      router.replace("/login");
+      router.refresh();
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onSignOut}
+      disabled={busy}
+      className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-60"
+    >
+      {busy ? "Signing out…" : "Sign out"}
+    </button>
+  );
+}
+
 export function Sidebar() {
   const [open, setOpen] = useState(false);
 
@@ -107,9 +137,16 @@ export function Sidebar() {
       {open && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-slate-900/40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-72 space-y-8 bg-white p-5 shadow-xl">
+          <div className="absolute left-0 top-0 flex h-full w-72 flex-col space-y-8 bg-white p-5 shadow-xl">
             <Brand />
             <NavLinks onNavigate={() => setOpen(false)} />
+            <div className="mt-auto space-y-2">
+              <SignOutButton onDone={() => setOpen(false)} />
+              <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+                <p className="font-semibold text-slate-600">SlideSmith</p>
+                <p className="mt-0.5">PowerPoint &amp; ProPresenter 7 generator for church services.</p>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -118,9 +155,12 @@ export function Sidebar() {
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-8 border-r border-slate-200 bg-white p-5 md:flex">
         <Brand />
         <NavLinks />
-        <div className="mt-auto rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
-          <p className="font-semibold text-slate-600">SlideSmith</p>
-          <p className="mt-0.5">PowerPoint &amp; ProPresenter 7 generator for church services.</p>
+        <div className="mt-auto space-y-2">
+          <SignOutButton />
+          <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+            <p className="font-semibold text-slate-600">SlideSmith</p>
+            <p className="mt-0.5">PowerPoint &amp; ProPresenter 7 generator for church services.</p>
+          </div>
         </div>
       </aside>
 

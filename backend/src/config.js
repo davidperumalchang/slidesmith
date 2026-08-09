@@ -10,11 +10,24 @@ export const ROOT_DIR = path.resolve(__dirname, "..");
 export const PORT = Number.parseInt(process.env.PORT ?? "4000", 10);
 export const NODE_ENV = process.env.NODE_ENV ?? "development";
 
+// PostgreSQL connection string (required).
+export const DATABASE_URL = process.env.DATABASE_URL ?? "";
+
+// Session cookie
+export const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? "slidesmith_session";
+export const SESSION_TTL_DAYS = Number.parseInt(process.env.SESSION_TTL_DAYS ?? "7", 10);
+// When the browser talks to the API via the Next.js same-origin proxy, Lax is ideal.
+// Use None only for true cross-site setups (requires Secure).
+export const COOKIE_SAMESITE = (process.env.COOKIE_SAMESITE ?? "lax").toLowerCase();
+export const COOKIE_SECURE =
+  process.env.COOKIE_SECURE === "true" ||
+  (process.env.COOKIE_SECURE !== "false" && NODE_ENV === "production" && COOKIE_SAMESITE === "none");
+
 // CORS: comma-separated allowlist of origins permitted to call the API.
 // Defaults cover local Next.js dev + the docker-compose frontend service.
 export const CORS_ALLOWED_ORIGINS = (
   process.env.CORS_ALLOWED_ORIGINS ??
-  "http://localhost:3000,http://127.0.0.1:3000"
+  "http://localhost:3000,http://127.0.0.1:3000,http://localhost:4001,http://127.0.0.1:4001"
 )
   .split(",")
   .map((o) => o.trim())

@@ -1,3 +1,9 @@
+export type AuthUser = {
+  id: string;
+  email: string;
+  displayName: string;
+};
+
 export type Pastor = {
   id: number;
   name: string;

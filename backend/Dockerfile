@@ -3,8 +3,11 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 ENV NODE_ENV=production
+# argon2 may need a compile toolchain when no musl prebuild is available.
+RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force \
+ && apk del python3 make g++
 
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -26,12 +29,15 @@ COPY data ./data
 # regardless of the permissions they had in the build context.
 RUN chmod -R a+rX src proto bible assets data
 
+# argon2 ships a native addon; ensure the runtime image can load it.
+# (node:alpine already includes the needed musl libc.)
+
 # Run as the built-in unprivileged user
 USER node
 
 EXPOSE 4000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "src/server.js"]
