@@ -1,0 +1,51 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Backend project root (one level up from src/)
+export const ROOT_DIR = path.resolve(__dirname, "..");
+
+// Server
+export const PORT = Number.parseInt(process.env.PORT ?? "4000", 10);
+export const NODE_ENV = process.env.NODE_ENV ?? "development";
+
+// CORS: comma-separated allowlist of origins permitted to call the API.
+// Defaults cover local Next.js dev + the docker-compose frontend service.
+export const CORS_ALLOWED_ORIGINS = (
+  process.env.CORS_ALLOWED_ORIGINS ??
+  "http://localhost:3000,http://127.0.0.1:3000"
+)
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+// Upload limits
+export const MAX_UPLOAD_BYTES = Number.parseInt(
+  process.env.MAX_UPLOAD_BYTES ?? String(10 * 1024 * 1024), // 10 MB
+  10,
+);
+
+// Asset directories
+export const PROTO_DIR = path.join(ROOT_DIR, "proto");
+export const BIBLE_DIR = path.join(ROOT_DIR, "bible");
+export const BIBLE_USX_DIR = path.join(BIBLE_DIR, "release", "USX_1");
+export const BIBLE_METADATA_PATH = path.join(BIBLE_DIR, "metadata.xml");
+
+export const BACKGROUNDS_DIR = path.join(ROOT_DIR, "assets", "backgrounds");
+export const LYRICS_PPT_BACKGROUND_PATH = path.join(BACKGROUNDS_DIR, "lyrics_bg.jpg");
+export const SERMON_PPT_BACKGROUND_PATH = path.join(BACKGROUNDS_DIR, "sermon_bg.jpg");
+
+export const TEMPLATES_DIR = path.join(ROOT_DIR, "assets", "templates");
+export const LYRICS_PP7_TEMPLATE_SIMPLE = path.join(TEMPLATES_DIR, "lyrics", "Template_Basic.pro");
+export const LYRICS_PP7_TEMPLATE_THEME = path.join(TEMPLATES_DIR, "lyrics", "Template_Lower_Third.pro");
+export const SERMON_PP7_TEMPLATE_SIMPLE = path.join(TEMPLATES_DIR, "sermon", "Sermon_Template_Basic.pro");
+export const SERMON_PP7_TEMPLATE_THEME = path.join(TEMPLATES_DIR, "sermon", "Sermon_Template_Lower_Third.pro");
+
+export const PASTORS_INFO_PATH = path.join(ROOT_DIR, "data", "pastors_info.json");
+
+// Bible version metadata (bundled offline Bible is NKJV)
+export const DEFAULT_BIBLE_VERSION = "NKJV";
+
+// ProPresenter font sizes (points, before RTF doubling where noted)
+export const LYRICS_PP7_DEFAULT_FONT_SIZE = 100; // RTF half-points already

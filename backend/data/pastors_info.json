@@ -1,0 +1,40 @@
+{
+    "pastors": [
+        {
+            "id": 1,
+            "name": "Pastor Clarance Shashi",
+            "title": "Senior Pastor",
+            "location": "Destiny C3"
+        },
+        {
+            "id": 2,
+            "name": "Pastor Deborah Clarance",
+            "title": "Senior Pastor",
+            "location": "Destiny C3"
+        },
+        {
+            "id": 3,
+            "name": "Pastor Ramesh Kumar",
+            "title": "Campus Pastor",
+            "location": "Destiny C3"
+        },
+        {
+            "id": 4,
+            "name": "Pastor Dale Padman",
+            "title": "Senior Pastor",
+            "location": "Destiny C3"
+        },
+        {
+            "id": 5,
+            "name": "Dr. Donald De Rozario",
+            "title": "Associate Pastor",
+            "location": "Destiny C3"
+        },
+        {
+            "id": 6,
+            "name": "Rev. Dr. Jai Kumar",
+            "title": "Associate Pastor",
+            "location": "Destiny C3"
+        }
+    ]
+}
