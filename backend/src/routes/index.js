@@ -5,9 +5,11 @@ import { uploadDocx } from "../middleware/upload.js";
 import {
   lookupSchema,
   lyricsContentSchema,
+  lyricsPreviewSchema,
   lyricsPp7Schema,
   sermonPptSchema,
   sermonPp7Schema,
+  sermonPreviewSchema,
 } from "../schemas.js";
 
 import { listPastors } from "../controllers/pastors.controller.js";
@@ -15,10 +17,15 @@ import { extractVerses } from "../controllers/verses.controller.js";
 import { lookupPassages } from "../controllers/passages.controller.js";
 import {
   validateLyrics,
+  previewLyricsSlides,
   createLyricsPptx,
   createLyricsPp7,
 } from "../controllers/lyrics.controller.js";
-import { createSermonPptx, createSermonPp7 } from "../controllers/sermon.controller.js";
+import {
+  previewSermonSlides,
+  createSermonPptx,
+  createSermonPp7,
+} from "../controllers/sermon.controller.js";
 
 const router = Router();
 
@@ -33,10 +40,12 @@ router.post("/passages/lookup", validateBody(lookupSchema), lookupPassages);
 
 // Lyrics
 router.post("/lyrics/validate", validateBody(lyricsContentSchema), validateLyrics);
+router.post("/lyrics/preview", validateBody(lyricsPreviewSchema), previewLyricsSlides);
 router.post("/generate/lyrics-ppt", validateBody(lyricsContentSchema), createLyricsPptx);
 router.post("/generate/lyrics-pp7", validateBody(lyricsPp7Schema), createLyricsPp7);
 
 // Sermon
+router.post("/sermon/preview", validateBody(sermonPreviewSchema), previewSermonSlides);
 router.post("/generate/sermon-ppt", validateBody(sermonPptSchema), createSermonPptx);
 router.post("/generate/sermon-pp7", validateBody(sermonPp7Schema), createSermonPp7);
 

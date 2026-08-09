@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import {
-  HomeIcon,
-  MusicIcon,
-  BookIcon,
-  SlidesIcon,
-  ProjectorIcon,
-} from "./icons";
+import { HomeIcon, MusicIcon, BookIcon } from "./icons";
 
 type NavItem = {
   href: string;
@@ -22,17 +16,10 @@ type NavGroup = { title?: string; items: NavItem[] };
 const groups: NavGroup[] = [
   { items: [{ href: "/", label: "Home", icon: HomeIcon }] },
   {
-    title: "PowerPoint",
+    title: "Tools",
     items: [
-      { href: "/lyrics-ppt", label: "Lyrics Slides", icon: MusicIcon },
-      { href: "/sermon-ppt", label: "Sermon Slides", icon: BookIcon },
-    ],
-  },
-  {
-    title: "ProPresenter 7",
-    items: [
-      { href: "/lyrics-pp7", label: "Lyrics .pro", icon: SlidesIcon },
-      { href: "/sermon-pp7", label: "Sermon .pro", icon: ProjectorIcon },
+      { href: "/lyrics", label: "Lyrics", icon: MusicIcon },
+      { href: "/sermon", label: "Sermon", icon: BookIcon },
     ],
   },
 ];

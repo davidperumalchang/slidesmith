@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { getPastorById } from "../services/pastors.js";
 import { generateSermonPptx } from "../services/sermonPpt.js";
 import { generateSermonPp7 } from "../services/sermonPp7.js";
+import { previewSermon } from "../services/sermonPreview.js";
 import { sendDownload, CONTENT_TYPES } from "../utils/download.js";
 
 function resolvePastor(pastorId) {
@@ -11,6 +12,20 @@ function resolvePastor(pastorId) {
   if (!pastor) throw ApiError.badRequest(`Pastor with id ${pastorId} not found.`);
   return pastor;
 }
+
+export const previewSermonSlides = asyncHandler(async (req, res) => {
+  const { slides, format, pastorId, sermonTitle, useTheme } = req.body;
+  const pastor = resolvePastor(pastorId);
+  res.json(
+    previewSermon({
+      slides,
+      format,
+      pastor,
+      sermonTitle,
+      useTheme,
+    }),
+  );
+});
 
 export const createSermonPptx = asyncHandler(async (req, res) => {
   const { slides, pastorId, sermonTitle } = req.body;

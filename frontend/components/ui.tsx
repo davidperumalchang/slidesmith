@@ -1,13 +1,21 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useEffect, useId, useRef, useState } from "react";
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
-  SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
+import { SlidesIcon, ProjectorIcon, ChevronDownIcon, CheckIcon } from "./icons";
+
+export type OutputFormat = "ppt" | "pp7";
+
+export type SelectOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+};
 
 // ---------------------------------------------------------------------------
 // Button
@@ -78,15 +86,139 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   },
 );
 
-export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
-  function Select({ className = "", children, ...rest }, ref) {
-    return (
-      <select ref={ref} className={`input-base pr-9 ${className}`} {...rest}>
-        {children}
-      </select>
+/**
+ * Custom dropdown matching the app's select style:
+ * light trigger, brand focus ring when open, dark glass menu with a check on
+ * the selected option.
+ */
+export function Select({
+  value,
+  onChange,
+  options,
+  placeholder = "Select…",
+  disabled = false,
+  className = "",
+  id,
+  "aria-label": ariaLabel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+  id?: string;
+  "aria-label"?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const selected = options.find((o) => o.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const moveSelection = (dir: 1 | -1) => {
+    const enabled = options.filter((o) => !o.disabled);
+    if (enabled.length === 0) return;
+    const idx = Math.max(
+      0,
+      enabled.findIndex((o) => o.value === value),
     );
-  },
-);
+    const next = enabled[(idx + dir + enabled.length) % enabled.length];
+    onChange(next.value);
+  };
+
+  return (
+    <div ref={rootRef} className={`relative ${className}`}>
+      <button
+        id={id}
+        type="button"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-label={ariaLabel}
+        onClick={() => !disabled && setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            if (!open) setOpen(true);
+            else moveSelection(1);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            if (!open) setOpen(true);
+            else moveSelection(-1);
+          } else if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((v) => !v);
+          }
+        }}
+        className={`input-base flex items-center justify-between gap-2 pr-3 text-left ${
+          open
+            ? "border-brand-500 ring-2 ring-brand-200"
+            : ""
+        } ${!selected ? "text-slate-400" : ""}`}
+      >
+        <span className="truncate">{selected ? selected.label : placeholder}</span>
+        <ChevronDownIcon
+          className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180 text-brand-600" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <ul
+          id={listId}
+          role="listbox"
+          aria-activedescendant={selected ? `${listId}-${selected.value}` : undefined}
+          className="absolute left-0 right-0 z-40 mt-1.5 max-h-60 overflow-auto rounded-2xl border border-white/10 bg-slate-800/90 p-1.5 shadow-xl shadow-slate-900/30 backdrop-blur-xl"
+        >
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <li key={opt.value} role="option" aria-selected={isSelected} id={`${listId}-${opt.value}`}>
+                <button
+                  type="button"
+                  disabled={opt.disabled}
+                  onClick={() => {
+                    if (opt.disabled) return;
+                    onChange(opt.value);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                    opt.disabled
+                      ? "cursor-not-allowed text-white/30"
+                      : isSelected
+                        ? "bg-white/15 font-medium text-white"
+                        : "text-white/90 hover:bg-white/10"
+                  }`}
+                >
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                    {isSelected && <CheckIcon className="h-3.5 w-3.5 text-white" />}
+                  </span>
+                  <span className="truncate">{opt.label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export function Field({
   label,
@@ -214,6 +346,75 @@ export function StepBadge({ n, title, done }: { n: number; title: string; done?:
         {n}
       </span>
       <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Output format toggle (PowerPoint vs ProPresenter 7)
+// ---------------------------------------------------------------------------
+export function OutputFormatToggle({
+  value,
+  onChange,
+}: {
+  value: OutputFormat;
+  onChange: (v: OutputFormat) => void;
+}) {
+  const options = [
+    {
+      value: "ppt" as const,
+      label: "PowerPoint",
+      sub: ".pptx",
+      desc: "Editable slides — PowerPoint, Keynote, Google Slides",
+      Icon: SlidesIcon,
+    },
+    {
+      value: "pp7" as const,
+      label: "ProPresenter 7",
+      sub: ".pro",
+      desc: "Native ProPresenter 7 file",
+      Icon: ProjectorIcon,
+    },
+  ];
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {options.map((opt) => {
+        const active = value === opt.value;
+        const Icon = opt.Icon;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(opt.value)}
+            className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${
+              active
+                ? "border-brand-500 bg-brand-50 ring-1 ring-brand-300"
+                : "border-slate-300 bg-white hover:border-slate-400"
+            }`}
+          >
+            <span
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                active ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-500"
+              }`}
+            >
+              <Icon className="h-5 w-5" />
+            </span>
+            <span>
+              <span className="flex items-center gap-2">
+                <span className={`text-sm font-semibold ${active ? "text-brand-700" : "text-slate-800"}`}>
+                  {opt.label}
+                </span>
+                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+                  {opt.sub}
+                </span>
+              </span>
+              <span className="mt-0.5 block text-xs text-slate-500">{opt.desc}</span>
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

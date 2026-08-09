@@ -37,6 +37,13 @@ export const lyricsContentSchema = z.object({
   content: z.string().min(1, "Lyrics content is required.").max(MAX_TEXT),
 });
 
+export const lyricsPreviewSchema = z.object({
+  content: z.string().min(1, "Lyrics content is required.").max(MAX_TEXT),
+  format: z.enum(["ppt", "pp7"]),
+  // Only used for ProPresenter previews (simple vs lower-third theme).
+  useTheme: booleanish,
+});
+
 export const lyricsPp7Schema = z.object({
   content: z.string().min(1, "Lyrics content is required.").max(MAX_TEXT),
   useTheme: booleanish,
@@ -51,5 +58,14 @@ export const sermonPptSchema = z.object({
 export const sermonPp7Schema = z.object({
   slides: slidesSchema,
   pastorId: z.coerce.number().int().positive().optional(),
+  useTheme: booleanish,
+});
+
+export const sermonPreviewSchema = z.object({
+  slides: slidesSchema,
+  format: z.enum(["ppt", "pp7"]),
+  pastorId: z.coerce.number().int().positive().optional(),
+  sermonTitle: z.string().max(500).optional(),
+  // Only used for ProPresenter previews (simple vs lower-third theme).
   useTheme: booleanish,
 });

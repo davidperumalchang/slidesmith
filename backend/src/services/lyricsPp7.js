@@ -1,6 +1,7 @@
 import { LYRICS_PP7_TEMPLATE_SIMPLE, LYRICS_PP7_TEMPLATE_THEME } from "../config.js";
-import { safeFilename } from "../utils/text.js";
+import { cleanLineEndings, safeFilename } from "../utils/text.js";
 import { ApiError } from "../utils/ApiError.js";
+import { validateLyricsFormat } from "./lyricsPpt.js";
 import {
   getTypes,
   readPresentation,
@@ -14,17 +15,49 @@ import {
   newUuid,
 } from "./proPresenter.js";
 
+// ProPresenter lyric slides show this many lyric lines per slide.
+const LINES_PER_SLIDE = 2;
+
 /**
- * Parse lyrics text into a title + list of slide blocks (separated by blank lines).
+ * Parse PowerPoint-style lyrics (title + labelled stanzas) into the ordered list
+ * of ProPresenter slide texts:
+ *   - the first line is the song title (used for the filename, not a slide),
+ *   - each stanza's label (e.g. "Verse 1", "Chorus") becomes its own slide,
+ *   - each stanza's lyric lines are chunked into slides of 2 lines each.
  * @param {string} content
+ * @returns {{ title: string|null, blocks: string[] }}
  */
-export function parseLyricsBlocks(content) {
-  const blocks = String(content ?? "")
-    .split("\n\n")
-    .map((b) => b.trim())
+export function parseLyricsToPp7Slides(content) {
+  const stanzas = String(content ?? "")
+    .split(/\n\s*\n/)
+    .map((s) => s.trim())
     .filter(Boolean);
-  if (blocks.length === 0) return { title: null, blocks: [] };
-  return { title: blocks[0], blocks: blocks.slice(1) };
+
+  if (stanzas.length === 0) return { title: null, blocks: [] };
+
+  const title = stanzas[0].split("\n")[0].trim();
+  const blocks = [];
+
+  for (const stanza of stanzas.slice(1)) {
+    const lines = stanza
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length === 0) continue;
+
+    const [label, ...rawLyricLines] = lines;
+    blocks.push(label); // section label as its own slide
+
+    // Match PowerPoint: strip trailing punctuation from each lyric line.
+    const lyricText = cleanLineEndings(rawLyricLines.join("\n"));
+    const lyricLines = lyricText.split("\n").filter(Boolean);
+
+    for (let i = 0; i < lyricLines.length; i += LINES_PER_SLIDE) {
+      blocks.push(lyricLines.slice(i, i + LINES_PER_SLIDE).join("\n"));
+    }
+  }
+
+  return { title, blocks };
 }
 
 function detectTemplateType(presentation, presentationSlideType) {
@@ -63,11 +96,20 @@ function detectTemplateType(presentation, presentationSlideType) {
  * @param {{useTheme?: boolean}} [options]
  * @returns {Promise<{buffer:Buffer, filename:string, slideCount:number}>}
  */
+function slideName(text, index) {
+  const firstLine = String(text).split("\n")[0].trim();
+  return firstLine || `Slide ${index + 1}`;
+}
+
 export async function generateLyricsPp7(content, { useTheme = false } = {}) {
-  const { title, blocks } = parseLyricsBlocks(content);
+  // Same labelled-stanza format as PowerPoint.
+  const { valid, message } = validateLyricsFormat(content);
+  if (!valid) throw ApiError.unprocessable(message);
+
+  const { title, blocks } = parseLyricsToPp7Slides(content);
   if (!title || blocks.length === 0) {
     throw ApiError.unprocessable(
-      "Lyrics must include a title line followed by at least one block of lyrics.",
+      "Lyrics must include a title line followed by at least one labelled stanza (e.g. 'Verse 1') with lyric lines.",
     );
   }
 
@@ -84,7 +126,8 @@ export async function generateLyricsPp7(content, { useTheme = false } = {}) {
   const { mainIndex } = detectTemplateType(presentation, ACTION_TYPE_PRESENTATION_SLIDE);
   const templateCue = presentation.cues[0];
 
-  // Update the first (template) slide with the first block.
+  // Update the first (template) slide with the first block (usually a section label).
+  templateCue.name = slideName(blocks[0], 0);
   for (const action of templateCue.actions ?? []) {
     if (action.type !== ACTION_TYPE_PRESENTATION_SLIDE) continue;
     const baseSlide = getBaseSlide(action);
@@ -103,7 +146,7 @@ export async function generateLyricsPp7(content, { useTheme = false } = {}) {
       const newCue = await cloneCue(templateCue);
       const newCueUuid = newUuid();
       newCue.uuid = mkUuid(newCueUuid);
-      newCue.name = `Slide ${i + 1}`;
+      newCue.name = slideName(lyricsText, i);
 
       if (newCue.actions?.length > 0) {
         const action = newCue.actions[0];

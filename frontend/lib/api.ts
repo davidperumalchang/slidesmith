@@ -1,6 +1,8 @@
 import type {
   LookupResponse,
+  LyricsPreviewResponse,
   Pastor,
+  SermonPreviewResponse,
   Slide,
   ValidateResponse,
   VerseExtractResponse,
@@ -72,6 +74,34 @@ export async function validateLyrics(content: string): Promise<ValidateResponse>
     body: JSON.stringify({ content }),
   });
   return json<ValidateResponse>(res);
+}
+
+export async function previewLyrics(
+  content: string,
+  format: "ppt" | "pp7",
+  useTheme = false,
+): Promise<LyricsPreviewResponse> {
+  const res = await fetch(`${API_BASE_URL}/lyrics/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content, format, useTheme }),
+  });
+  return json<LyricsPreviewResponse>(res);
+}
+
+export async function previewSermon(params: {
+  slides: Slide[];
+  format: "ppt" | "pp7";
+  pastorId?: number;
+  sermonTitle?: string;
+  useTheme?: boolean;
+}): Promise<SermonPreviewResponse> {
+  const res = await fetch(`${API_BASE_URL}/sermon/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  return json<SermonPreviewResponse>(res);
 }
 
 // ---------------------------------------------------------------------------

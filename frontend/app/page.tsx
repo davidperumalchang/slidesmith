@@ -1,43 +1,22 @@
 import Link from "next/link";
-import {
-  MusicIcon,
-  BookIcon,
-  SlidesIcon,
-  ProjectorIcon,
-  ArrowRightIcon,
-  SparklesIcon,
-} from "@/components/icons";
+import { MusicIcon, BookIcon, ArrowRightIcon, SparklesIcon } from "@/components/icons";
 
-const features = [
+const tools = [
   {
-    href: "/lyrics-ppt",
-    title: "Lyrics → PowerPoint",
-    description: "Turn song lyrics into styled PowerPoint slides, one stanza per slide.",
+    href: "/lyrics",
+    title: "Lyrics",
+    description: "Turn song lyrics into presentation slides for your worship set.",
     icon: MusicIcon,
-    tag: "PowerPoint",
   },
   {
-    href: "/sermon-ppt",
-    title: "Sermon → PowerPoint",
-    description: "Build a sermon deck with a title slide, pastor info and Bible passages.",
+    href: "/sermon",
+    title: "Sermon",
+    description: "Extract Bible references, look up passages, and build sermon slides.",
     icon: BookIcon,
-    tag: "PowerPoint",
-  },
-  {
-    href: "/lyrics-pp7",
-    title: "Lyrics → ProPresenter 7",
-    description: "Generate a ready-to-use .pro file for song lyrics from a template.",
-    icon: SlidesIcon,
-    tag: "ProPresenter 7",
-  },
-  {
-    href: "/sermon-pp7",
-    title: "Sermon → ProPresenter 7",
-    description: "Create a sermon .pro file with references, verses and pastor details.",
-    icon: ProjectorIcon,
-    tag: "ProPresenter 7",
   },
 ];
+
+const FORMATS = ["PowerPoint", "ProPresenter 7"];
 
 export default function HomePage() {
   return (
@@ -52,29 +31,34 @@ export default function HomePage() {
         </h1>
         <p className="mt-3 max-w-2xl text-base text-slate-600">
           Generate PowerPoint presentations and ProPresenter&nbsp;7 files for your services in
-          seconds. Pick a tool below to get started.
+          seconds. Pick a tool, then choose your output format.
         </p>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        {features.map((f) => {
-          const Icon = f.icon;
+        {tools.map((t) => {
+          const Icon = t.icon;
           return (
             <Link
-              key={f.href}
-              href={f.href}
+              key={t.href}
+              href={t.href}
               className="group card p-6 transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md"
             >
-              <div className="flex items-start justify-between">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-md shadow-brand-600/30">
-                  <Icon className="h-6 w-6" />
-                </span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                  {f.tag}
-                </span>
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-md shadow-brand-600/30">
+                <Icon className="h-6 w-6" />
+              </span>
+              <h2 className="mt-4 text-lg font-semibold text-slate-900">{t.title}</h2>
+              <p className="mt-1.5 text-sm text-slate-500">{t.description}</p>
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {FORMATS.map((f) => (
+                  <span
+                    key={f}
+                    className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500"
+                  >
+                    {f}
+                  </span>
+                ))}
               </div>
-              <h2 className="mt-4 text-lg font-semibold text-slate-900">{f.title}</h2>
-              <p className="mt-1.5 text-sm text-slate-500">{f.description}</p>
               <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600">
                 Open tool
                 <ArrowRightIcon className="h-4 w-4 transition group-hover:translate-x-0.5" />

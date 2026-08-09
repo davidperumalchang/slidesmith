@@ -12,15 +12,17 @@ import {
   Segmented,
   StepBadge,
 } from "@/components/ui";
-import { UploadIcon, DownloadIcon, CheckIcon } from "@/components/icons";
+import { UploadIcon, DownloadIcon, CheckIcon, EyeIcon } from "@/components/icons";
+import { SermonPreviewModal } from "@/components/SermonPreviewModal";
 import {
   getPastors,
   extractVerses,
   lookupPassages,
+  previewSermon,
   generateSermonPptx,
   generateSermonPp7,
 } from "@/lib/api";
-import type { Pastor, Slide } from "@/lib/types";
+import type { Pastor, SermonPreviewResponse, Slide } from "@/lib/types";
 
 type SourceTab = "docx" | "refs" | "manual";
 type Msg = { type: "success" | "error" | "info" | "warning"; text: string } | null;
@@ -74,11 +76,17 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
   const [extracting, setExtracting] = useState(false);
   const [lookingUp, setLookingUp] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<SermonPreviewResponse | null>(null);
 
   const [slides, setSlides] = useState<Slide[] | null>(null);
   const [notFound, setNotFound] = useState<string[]>([]);
   const [step1Msg, setStep1Msg] = useState<Msg>(null);
   const [genMsg, setGenMsg] = useState<Msg>(null);
+
+  const busy = extracting || lookingUp || generating || previewLoading;
 
   useEffect(() => {
     getPastors()
@@ -155,6 +163,29 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
     setSlides(parsed);
   };
 
+  const onPreview = async () => {
+    if (!slides || slides.length === 0) return;
+    setPreviewError(null);
+    setPreview(null);
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    try {
+      const pid = pastorId ? Number(pastorId) : undefined;
+      const res = await previewSermon({
+        slides,
+        format: outputType,
+        pastorId: pid,
+        sermonTitle: sermonTitle || undefined,
+        useTheme: template === "theme",
+      });
+      setPreview(res);
+    } catch (e) {
+      setPreviewError(e instanceof Error ? e.message : "Preview failed.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const onGenerate = async () => {
     if (!slides || slides.length === 0) return;
     setGenMsg(null);
@@ -175,12 +206,17 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
 
   const lookupControls = (
     <div className="mt-4 flex flex-wrap items-end gap-3">
-      <div className="w-40">
+      <div className="w-52">
         <Field label="Source">
-          <Select value={source} onChange={(e) => setSource(e.target.value as "offline" | "online")}>
-            <option value="offline">Offline (NKJV)</option>
-            <option value="online">Online (BibleGateway)</option>
-          </Select>
+          <Select
+            value={source}
+            onChange={(v) => setSource(v as "offline" | "online")}
+            options={[
+              { value: "offline", label: "Offline (NKJV)" },
+              { value: "online", label: "Online (BibleGateway)" },
+            ]}
+            aria-label="Bible lookup source"
+          />
         </Field>
       </div>
       {source === "online" && (
@@ -331,14 +367,19 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
         <StepBadge n={2} title="Details & generate" />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Preacher" hint="Optional — leave as placeholder to fill in later.">
-            <Select value={pastorId} onChange={(e) => setPastorId(e.target.value)}>
-              <option value="">— Select preacher —</option>
-              {pastors.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} — {p.title}, {p.location}
-                </option>
-              ))}
-            </Select>
+            <Select
+              value={pastorId}
+              onChange={setPastorId}
+              placeholder="Select preacher…"
+              options={[
+                { value: "", label: "— Select preacher —" },
+                ...pastors.map((p) => ({
+                  value: String(p.id),
+                  label: `${p.name} — ${p.title}, ${p.location}`,
+                })),
+              ]}
+              aria-label="Preacher"
+            />
           </Field>
 
           {outputType === "ppt" ? (
@@ -369,16 +410,37 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
           </div>
         )}
 
-        <div className="mt-5">
-          <Button onClick={onGenerate} loading={generating} disabled={!slides || slides.length === 0}>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button
+            variant="secondary"
+            onClick={onPreview}
+            loading={previewLoading}
+            disabled={!slides || slides.length === 0 || (busy && !previewLoading)}
+          >
+            <EyeIcon className="h-4 w-4" />
+            Preview
+          </Button>
+          <Button
+            onClick={onGenerate}
+            loading={generating}
+            disabled={!slides || slides.length === 0 || (busy && !generating)}
+          >
             <DownloadIcon className="h-4 w-4" />
             {outputType === "ppt" ? "Generate PowerPoint" : "Generate .pro file"}
           </Button>
           {(!slides || slides.length === 0) && (
-            <p className="mt-2 text-xs text-slate-500">Complete step 1 to enable generation.</p>
+            <p className="w-full text-xs text-slate-500">Complete step 1 to enable preview and generation.</p>
           )}
         </div>
       </Card>
+
+      <SermonPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        loading={previewLoading}
+        error={previewError}
+        preview={preview}
+      />
     </div>
   );
 }
