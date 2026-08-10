@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
-import { HomeIcon, MusicIcon, BookIcon } from "./icons";
-import { logout } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { HomeIcon, MusicIcon, BookIcon, LogoutIcon } from "./icons";
+import { getMe, logout } from "@/lib/api";
+import type { AuthUser } from "@/lib/types";
 
 type NavItem = {
   href: string;
@@ -84,9 +85,34 @@ function Brand() {
   );
 }
 
-function SignOutButton({ onDone }: { onDone?: () => void }) {
+function initialsFor(user: AuthUser): string {
+  const name = user.displayName?.trim();
+  if (name) {
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  }
+  return user.email.slice(0, 2).toUpperCase();
+}
+
+function AccountSection({ onDone }: { onDone?: () => void }) {
   const router = useRouter();
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getMe()
+      .then((me) => {
+        if (!cancelled) setUser(me);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const onSignOut = async () => {
     if (busy) return;
@@ -101,15 +127,38 @@ function SignOutButton({ onDone }: { onDone?: () => void }) {
     }
   };
 
+  const label = user?.displayName?.trim() || user?.email || "Signed in";
+
   return (
-    <button
-      type="button"
-      onClick={onSignOut}
-      disabled={busy}
-      className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-60"
-    >
-      {busy ? "Signing out…" : "Sign out"}
-    </button>
+    <div className="border-t border-slate-200 pt-4">
+      <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        Account
+      </p>
+      <div className="flex items-center gap-3 px-3 py-2">
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700 ring-1 ring-brand-100"
+          aria-hidden
+        >
+          {user ? initialsFor(user) : "…"}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-800">{label}</p>
+          {user?.displayName?.trim() && (
+            <p className="truncate text-xs text-slate-500">{user.email}</p>
+          )}
+          {!user && <p className="text-xs text-slate-400">Loading…</p>}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onSignOut}
+        disabled={busy}
+        className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-60"
+      >
+        <LogoutIcon className="h-5 w-5 shrink-0 text-slate-400" />
+        {busy ? "Signing out…" : "Sign out"}
+      </button>
+    </div>
   );
 }
 
@@ -137,15 +186,11 @@ export function Sidebar() {
       {open && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-slate-900/40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-0 flex h-full w-72 flex-col space-y-8 bg-white p-5 shadow-xl">
+          <div className="absolute left-0 top-0 flex h-full w-72 flex-col gap-8 bg-white p-5 shadow-xl">
             <Brand />
             <NavLinks onNavigate={() => setOpen(false)} />
-            <div className="mt-auto space-y-2">
-              <SignOutButton onDone={() => setOpen(false)} />
-              <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
-                <p className="font-semibold text-slate-600">SlideSmith</p>
-                <p className="mt-0.5">PowerPoint &amp; ProPresenter 7 generator for church services.</p>
-              </div>
+            <div className="mt-auto">
+              <AccountSection onDone={() => setOpen(false)} />
             </div>
           </div>
         </div>
@@ -155,12 +200,8 @@ export function Sidebar() {
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-8 border-r border-slate-200 bg-white p-5 md:flex">
         <Brand />
         <NavLinks />
-        <div className="mt-auto space-y-2">
-          <SignOutButton />
-          <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
-            <p className="font-semibold text-slate-600">SlideSmith</p>
-            <p className="mt-0.5">PowerPoint &amp; ProPresenter 7 generator for church services.</p>
-          </div>
+        <div className="mt-auto">
+          <AccountSection />
         </div>
       </aside>
 
