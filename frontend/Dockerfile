@@ -23,6 +23,7 @@ WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=4001 \
+    # 0.0.0.0 for Docker Compose; Fly overrides HOSTNAME=:: via fly.toml [env].
     HOSTNAME=0.0.0.0
 
 COPY --from=builder /app/public ./public

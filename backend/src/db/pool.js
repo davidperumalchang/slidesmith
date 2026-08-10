@@ -1,5 +1,5 @@
 import pg from "pg";
-import { DATABASE_URL } from "../config.js";
+import { DATABASE_URL, resolveDatabaseSsl } from "../config.js";
 
 const { Pool } = pg;
 
@@ -11,12 +11,15 @@ export function getPool() {
     if (!DATABASE_URL) {
       throw new Error("DATABASE_URL is not configured.");
     }
+    const ssl = resolveDatabaseSsl(DATABASE_URL);
     pool = new Pool({
       connectionString: DATABASE_URL,
+      ...(ssl ? { ssl } : {}),
       // Fail fast if the DB is unreachable at query time.
       connectionTimeoutMillis: 10_000,
       idleTimeoutMillis: 30_000,
-      max: 10,
+      // Keep modest for Supabase free/small tiers + session pooler.
+      max: Number.parseInt(process.env.DATABASE_POOL_MAX ?? "10", 10),
     });
     pool.on("error", (err) => {
       console.error("[db] Unexpected pool error:", err);

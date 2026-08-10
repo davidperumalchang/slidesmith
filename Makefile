@@ -10,7 +10,8 @@ SERVICE ?=
 .PHONY: help \
 	dev db db-logs shell-db backend frontend create-user install \
 	up up-build down stop start restart build ps logs logs-f \
-	shell-backend shell-frontend create-user-docker db-reset clean
+	shell-backend shell-frontend create-user-docker db-reset clean \
+	fly-deploy-api fly-deploy-web fly-deploy
 
 help: ## Show this help
 	@echo "SlideSmith"
@@ -21,6 +22,10 @@ help: ## Show this help
 	@echo ""
 	@echo "Docker Compose (full stack / deploy-like):"
 	@grep -E '^(up|up-build|down|stop|start|restart|build|ps|logs|logs-f|shell-backend|shell-frontend|create-user-docker|db-reset|clean):.*?## ' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "Fly.io (production — see README; needs flyctl + secrets already set):"
+	@grep -E '^(fly-deploy-api|fly-deploy-web|fly-deploy):.*?## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Typical coding loop:"
@@ -118,3 +123,15 @@ db-reset: ## Wipe Postgres volume and recreate DB (DESTRUCTIVE)
 
 clean: ## Stop stack and remove containers + orphan networks
 	$(COMPOSE) down --remove-orphans
+
+# ---------------------------------------------------------------------------
+# Fly.io (production — Supabase DATABASE_URL via `fly secrets`, not Compose db)
+# ---------------------------------------------------------------------------
+
+fly-deploy-api: ## Deploy backend to Fly (cd backend && fly deploy)
+	cd backend && fly deploy
+
+fly-deploy-web: ## Deploy frontend to Fly (cd frontend && fly deploy)
+	cd frontend && fly deploy
+
+fly-deploy: fly-deploy-api fly-deploy-web ## Deploy API then web to Fly

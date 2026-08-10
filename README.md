@@ -7,7 +7,7 @@ SlideSmith is a modern rewrite of the original Python desktop app (DC3 Multimedi
 - **Backend** — Node.js REST API (Express) + **PostgreSQL**
 - **Frontend** — Next.js (App Router, TypeScript, Tailwind CSS)
 - **Auth** — Session cookies (httpOnly), Argon2id password hashing
-- **Deployment** — Docker & Docker Compose
+- **Deployment** — Docker Compose (local) · Fly.io + Supabase (production)
 
 ---
 
@@ -162,9 +162,10 @@ curl -b cookies.txt -X POST http://localhost:4000/api/passages/lookup \
 
 ```
 slidesmith/
-├── docker-compose.yml          # db + backend + frontend
+├── docker-compose.yml          # db + backend + frontend (local)
 ├── .env.example                # single env template (copy to .env)
 ├── backend/
+│   ├── fly.toml                # Fly.io API app (Supabase DATABASE_URL)
 │   ├── Dockerfile
 │   ├── src/
 │   │   ├── loadEnv.js          # loads repo-root .env
@@ -181,6 +182,7 @@ slidesmith/
 │   ├── assets/                 # backgrounds + .pro templates
 │   └── data/pastors_info.json
 └── frontend/
+    ├── fly.toml                # Fly.io web app (proxies to API .internal)
     ├── Dockerfile
     ├── middleware.ts           # redirect unauthenticated users
     ├── app/(auth)/login/       # login page
@@ -203,6 +205,156 @@ The backend applies defense-in-depth:
 - Generic client-facing errors (detail logged server-side only)
 
 Change default passwords before any shared or production deployment. Prefer HTTPS and `COOKIE_SECURE=true` when terminating TLS.
+
+---
+
+## ☁️ Production deploy (Fly.io + Supabase)
+
+Local Docker Compose still uses the `db` service. **Production uses Supabase Postgres** — do not deploy the Compose Postgres container to Fly.
+
+Architecture:
+
+```
+Browser (HTTPS)
+  → slidesmith-web  (Next.js on Fly)
+       rewrite /backend-api/*  (same-origin cookie)
+  → http://slidesmith-api.internal:8080/api/*  (Fly private network)
+  → Supabase Postgres (DATABASE_URL)
+```
+
+### 0. Install once
+
+| Tool | macOS | Why |
+| --- | --- | --- |
+| [Fly CLI](https://fly.io/docs/flyctl/install/) (`fly`) | `brew install flyctl` | Deploy & secrets |
+| Fly account | [fly.io/app/sign-up](https://fly.io/app/sign-up) then `fly auth login` | Org + apps |
+| [Supabase](https://supabase.com) project | Dashboard → New project | Managed Postgres |
+| Docker Desktop | Already required for local Compose | Fly uses Docker to build images |
+
+Optional: `gh` is not required for Fly deploys.
+
+### 1. Create Supabase Postgres
+
+1. Create a project in the Supabase dashboard (pick a region close to Fly, e.g. Singapore → Fly `sin`).
+2. Open **Connect** and copy the **Session pooler** URI (port `5432`, host like `aws-0-….pooler.supabase.com`).
+   - Prefer **Session mode** on Fly (persistent Node process, IPv4-friendly).
+   - Avoid Transaction mode (port `6543`) unless you disable prepared statements — migrations and `pg` pools are happier on session/direct.
+3. Replace `[YOUR-PASSWORD]` with the database password.
+4. In the SQL editor, confirm `pgcrypto` is available (usually is):
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+```
+
+The API runs its own migrations on startup (`users`, `sessions`) — you do **not** need Supabase Auth for this app.
+
+### 2. Create Fly apps
+
+From the repo root (app names must match `fly.toml` / private DNS, or edit both files):
+
+```bash
+fly auth login
+
+# API
+cd backend
+fly apps create slidesmith-api   # skip if `fly launch` already created it
+# or: fly launch --no-deploy --name slidesmith-api --region sin
+
+# Web
+cd ../frontend
+fly apps create slidesmith-web
+# or: fly launch --no-deploy --name slidesmith-web --region sin
+```
+
+Use the same org for both apps so `.internal` networking works.
+
+### 3. Set backend secrets
+
+```bash
+cd backend
+
+# Replace with your real Supabase session-pooler URI and Fly web hostname.
+fly secrets set \
+  DATABASE_URL='postgresql://postgres.PROJECT_REF:YOUR_PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres' \
+  COOKIE_SECURE=true \
+  COOKIE_SAMESITE=lax \
+  CORS_ALLOWED_ORIGINS='https://slidesmith-web.fly.dev'
+```
+
+URL-encode special characters in the DB password. SSL is enabled automatically for Supabase hosts.
+
+### 4. Deploy API, then web
+
+```bash
+cd backend
+fly deploy
+
+# Confirm health (public URL is fine for /api/health)
+fly status
+fly logs
+curl -sS https://slidesmith-api.fly.dev/api/health
+```
+
+Then deploy the frontend. `API_INTERNAL_URL` is baked at **build** time from `frontend/fly.toml` (`http://slidesmith-api.internal:8080/api`). If you renamed the API app or changed its port, update that build arg before deploying.
+
+```bash
+cd ../frontend
+fly deploy
+
+curl -sS -o /dev/null -w '%{http_code}\n' https://slidesmith-web.fly.dev/login
+```
+
+Open `https://slidesmith-web.fly.dev` in a browser.
+
+### 5. Create the first login user
+
+Point local tooling at Supabase (does not need the Fly machines):
+
+```bash
+# In repo-root .env (local only — never commit):
+# DATABASE_URL=postgresql://postgres.PROJECT_REF:…@aws-0-….pooler.supabase.com:5432/postgres
+
+cd backend
+npm run create-user -- you@church.org 'your-secure-password' "Your Name"
+```
+
+Or from a one-off Fly machine shell:
+
+```bash
+cd backend
+fly ssh console -C "node scripts/create-user.js you@church.org 'your-secure-password' 'Your Name'"
+```
+
+Hash only (if you want to paste into SQL yourself):
+
+```bash
+cd backend
+npm run hash-password -- 'your-secure-password'
+```
+
+Then insert:
+
+```sql
+INSERT INTO users (email, password_hash, display_name)
+VALUES ('you@church.org', '<hash from above>', 'Your Name');
+```
+
+### 6. Useful Fly commands
+
+```bash
+fly apps list
+fly status -a slidesmith-api
+fly status -a slidesmith-web
+fly logs -a slidesmith-api
+fly secrets list -a slidesmith-api
+fly ssh console -a slidesmith-api
+```
+
+### Notes
+
+- Compose `db` service stays for **local** development only.
+- Backend keeps `min_machines_running = 1` so Fly `.internal` calls work without Flycast auto-start quirks.
+- PPT/PP7 generation is in-memory — API VM is sized at **1GB**; raise memory in `backend/fly.toml` if you hit OOM on large sermons.
 
 ---
 

@@ -1,6 +1,6 @@
 import "./loadEnv.js";
 import { createApp } from "./app.js";
-import { PORT, DATABASE_URL } from "./config.js";
+import { PORT, HOST, DATABASE_URL } from "./config.js";
 import { runMigrations } from "./db/migrate.js";
 import { closePool } from "./db/pool.js";
 import { purgeExpiredSessions } from "./services/auth.js";
@@ -27,8 +27,9 @@ async function start() {
   });
 
   const app = createApp();
-  const server = app.listen(PORT, () => {
-    console.log(`SlideSmith backend listening on port ${PORT}`);
+  // Bind to HOST ("::" by default) so Fly .internal (IPv6) can reach this process.
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`SlideSmith backend listening on [${HOST}]:${PORT}`);
   });
 
   const shutdown = (signal) => {

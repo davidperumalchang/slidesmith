@@ -11,8 +11,10 @@ RUN npm ci --omit=dev && npm cache clean --force \
 
 FROM node:22-alpine AS runner
 WORKDIR /app
+# PORT/HOST are overridden on Fly via fly.toml ([env] PORT=8080 HOST=::).
 ENV NODE_ENV=production \
-    PORT=4000
+    PORT=4000 \
+    HOST=::
 
 # Production dependencies
 COPY --from=deps /app/node_modules ./node_modules

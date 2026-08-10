@@ -6,9 +6,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Backend project root (one level up from src/)
 export const ROOT_DIR = path.resolve(__dirname, "..");
 
-// Server — PORT (container) or BACKEND_PORT (repo-root .env for local/Compose host mapping)
+// Server — PORT (container/Fly) or BACKEND_PORT (repo-root .env for local/Compose host mapping)
 export const PORT = Number.parseInt(process.env.PORT ?? process.env.BACKEND_PORT ?? "4000", 10);
 export const NODE_ENV = process.env.NODE_ENV ?? "development";
+// Fly private networking (.internal) is IPv6 — production defaults to "::".
+// Local `npm run dev` stays on IPv4 any-address for macOS friendliness.
+export const HOST = process.env.HOST ?? (NODE_ENV === "production" ? "::" : "0.0.0.0");
 
 /**
  * Prefer an explicit DATABASE_URL (Docker Compose sets this to host `db`).
@@ -29,15 +32,56 @@ function resolveDatabaseUrl() {
 
 export const DATABASE_URL = resolveDatabaseUrl();
 
+/**
+ * SSL for managed Postgres (Supabase). Local Docker Postgres stays plaintext unless
+ * DATABASE_SSL=true. Set DATABASE_SSL=false to force-disable.
+ */
+export function resolveDatabaseSsl(connectionString = DATABASE_URL) {
+  const flag = (process.env.DATABASE_SSL ?? "").toLowerCase();
+  if (flag === "false" || flag === "0") return undefined;
+  if (flag === "true" || flag === "1") {
+    return {
+      rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false",
+    };
+  }
+  if (!connectionString) return undefined;
+
+  try {
+    const normalized = connectionString.includes("://")
+      ? connectionString
+      : `postgres://${connectionString}`;
+    const u = new URL(normalized);
+    const host = u.hostname.toLowerCase();
+    const sslmode = (u.searchParams.get("sslmode") ?? "").toLowerCase();
+    if (sslmode === "disable") return undefined;
+
+    const isSupabase =
+      host.endsWith(".supabase.co") ||
+      host.endsWith(".supabase.com") ||
+      host.includes("pooler.supabase.com");
+    if (!isSupabase && !sslmode) return undefined;
+
+    // verify-full / verify-ca need the Supabase CA; default require-style encryption.
+    const verify =
+      sslmode === "verify-full" ||
+      sslmode === "verify-ca" ||
+      process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true";
+    return { rejectUnauthorized: verify };
+  } catch {
+    return undefined;
+  }
+}
+
 // Session cookie
 export const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? "slidesmith_session";
 export const SESSION_TTL_DAYS = Number.parseInt(process.env.SESSION_TTL_DAYS ?? "7", 10);
 // When the browser talks to the API via the Next.js same-origin proxy, Lax is ideal.
 // Use None only for true cross-site setups (requires Secure).
 export const COOKIE_SAMESITE = (process.env.COOKIE_SAMESITE ?? "lax").toLowerCase();
+// Secure cookies on HTTPS production (Fly). Docker Compose sets COOKIE_SECURE=false for local HTTP.
 export const COOKIE_SECURE =
   process.env.COOKIE_SECURE === "true" ||
-  (process.env.COOKIE_SECURE !== "false" && NODE_ENV === "production" && COOKIE_SAMESITE === "none");
+  (process.env.COOKIE_SECURE !== "false" && NODE_ENV === "production");
 
 // CORS: comma-separated allowlist of origins permitted to call the API.
 // Defaults cover local Next.js dev + the docker-compose frontend service.
