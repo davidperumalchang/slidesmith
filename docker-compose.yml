@@ -48,15 +48,14 @@ services:
       args:
         # Browser calls the Next.js same-origin proxy (keeps the session cookie on-site).
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/backend-api}
-        # Server-side rewrite target (Docker network hostname).
-        API_INTERNAL_URL: ${API_INTERNAL_URL:-http://backend:4000/api}
+        # Always the Compose service hostname (do not use localhost from root .env).
+        API_INTERNAL_URL: http://backend:4000/api
     image: slidesmith-frontend
     container_name: slidesmith-frontend
     environment:
       NODE_ENV: production
       PORT: 4001
-      # Also available at runtime for any server components that need it.
-      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://backend:4000/api}
+      API_INTERNAL_URL: http://backend:4000/api
     ports:
       - "${FRONTEND_PORT:-4001}:4001"
     depends_on:

@@ -6,7 +6,7 @@
  *   npm run create-user -- <email> <password> [displayName]
  *   npm run hash-password -- <password>
  */
-import "dotenv/config";
+import "../src/loadEnv.js";
 import { DATABASE_URL } from "../src/config.js";
 import { closePool } from "../src/db/pool.js";
 import { createUser, hashPassword } from "../src/services/auth.js";
@@ -42,7 +42,7 @@ async function main() {
   }
 
   if (!DATABASE_URL) {
-    console.error("DATABASE_URL is required (set it in backend/.env).");
+    console.error("DATABASE_URL is required (set POSTGRES_* in the repo-root .env).");
     process.exit(1);
   }
 

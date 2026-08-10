@@ -20,6 +20,7 @@ COPY package.json ./
 
 # Application source + bundled assets (Bible data, proto schema, templates, images)
 COPY src ./src
+COPY scripts ./scripts
 COPY proto ./proto
 COPY bible ./bible
 COPY assets ./assets
@@ -27,7 +28,7 @@ COPY data ./data
 
 # Ensure all bundled files are readable by the unprivileged runtime user
 # regardless of the permissions they had in the build context.
-RUN chmod -R a+rX src proto bible assets data
+RUN chmod -R a+rX src scripts proto bible assets data
 
 # argon2 ships a native addon; ensure the runtime image can load it.
 # (node:alpine already includes the needed musl libc.)

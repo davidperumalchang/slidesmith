@@ -6,12 +6,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Backend project root (one level up from src/)
 export const ROOT_DIR = path.resolve(__dirname, "..");
 
-// Server
-export const PORT = Number.parseInt(process.env.PORT ?? "4000", 10);
+// Server — PORT (container) or BACKEND_PORT (repo-root .env for local/Compose host mapping)
+export const PORT = Number.parseInt(process.env.PORT ?? process.env.BACKEND_PORT ?? "4000", 10);
 export const NODE_ENV = process.env.NODE_ENV ?? "development";
 
-// PostgreSQL connection string (required).
-export const DATABASE_URL = process.env.DATABASE_URL ?? "";
+/**
+ * Prefer an explicit DATABASE_URL (Docker Compose sets this to host `db`).
+ * Otherwise build one from POSTGRES_* for local `npm run dev`.
+ */
+function resolveDatabaseUrl() {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+
+  const user = process.env.POSTGRES_USER;
+  const password = process.env.POSTGRES_PASSWORD;
+  const db = process.env.POSTGRES_DB ?? "slidesmith";
+  const host = process.env.POSTGRES_HOST ?? "localhost";
+  const port = process.env.POSTGRES_PORT ?? "5433";
+  if (!user || !password) return "";
+
+  return `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${db}`;
+}
+
+export const DATABASE_URL = resolveDatabaseUrl();
 
 // Session cookie
 export const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? "slidesmith_session";

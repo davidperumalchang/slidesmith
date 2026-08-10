@@ -39,14 +39,15 @@ Prerequisites: Docker + Docker Compose.
 cp .env.example .env
 # Edit .env — set a strong POSTGRES_PASSWORD
 
-docker compose up --build
+make up-build          # or: docker compose up -d --build
+make help              # list all shortcuts
 ```
 
 Create your first login user (password min 12 chars):
 
 ```bash
-cd backend
-npm run create-user -- you@church.org 'your-secure-password' "Your Name"
+make create-user EMAIL=you@church.org PASS='your-secure-password' NAME='Your Name'
+# or locally: cd backend && npm run create-user -- you@church.org '…' "Your Name"
 ```
 
 Then open:
@@ -55,8 +56,11 @@ Then open:
 - Backend health: http://localhost:4000/api/health
 
 > The browser talks to the API through a **same-origin Next.js proxy** at `/backend-api/*`
-> (keeps the session cookie on the frontend host). That proxy targets
-> `API_INTERNAL_URL` inside Docker (`http://backend:4000/api`).
+> (keeps the session cookie on the frontend host). Inside Docker the proxy targets
+> `http://backend:4000/api`; for local `npm run dev` it uses `API_INTERNAL_URL` from `.env`.
+
+All configuration lives in the **repo-root `.env`** (see `.env.example`). There are no
+separate `backend/.env` or `frontend/.env` files.
 
 ---
 
@@ -85,31 +89,26 @@ Sign out from the sidebar.
 
 ## 🧑‍💻 Local development
 
-### Database
+While coding you do **not** need to rebuild Docker images. Run Postgres in Docker;
+run the apps locally with hot reload:
 
 ```bash
-# from repo root — start only Postgres
-docker compose up -d db
+# once
+cp .env.example .env          # set POSTGRES_PASSWORD
+make install
+make db                       # Postgres only
+make create-user EMAIL=you@church.org PASS='your-secure-password' NAME='You'
+
+# every day — two terminals
+make backend                  # http://localhost:4000  (Node --watch)
+make frontend                 # http://localhost:3000  (Next.js HMR)
 ```
 
-### Backend
+Or `make dev` to start Postgres and print the same instructions.
 
-```bash
-cd backend
-cp .env.example .env   # set DATABASE_URL
-npm install
-npm run create-user -- you@church.org 'your-secure-password' "Your Name"
-npm run dev            # http://localhost:4000
-```
-
-### Frontend
-
-```bash
-cd frontend
-cp .env.example .env   # NEXT_PUBLIC_API_BASE_URL=/backend-api
-npm install
-npm run dev            # http://localhost:3000
-```
+Use `make up-build` only when you want a full production-like stack, or after
+Dockerfile / dependency changes. `DATABASE_URL` is built from `POSTGRES_*` in
+the root `.env`.
 
 Requires Node.js 18+ (Node 20/22 recommended; Docker uses Node 22).
 
@@ -164,11 +163,12 @@ curl -b cookies.txt -X POST http://localhost:4000/api/passages/lookup \
 ```
 slidesmith/
 ├── docker-compose.yml          # db + backend + frontend
-├── .env.example
+├── .env.example                # single env template (copy to .env)
 ├── backend/
 │   ├── Dockerfile
 │   ├── src/
-│   │   ├── server.js           # migrate → seed → listen
+│   │   ├── loadEnv.js          # loads repo-root .env
+│   │   ├── server.js           # migrate → listen
 │   │   ├── app.js              # express + security middleware
 │   │   ├── db/                 # pool + SQL migrations
 │   │   ├── routes/             # API routes (auth-gated)
