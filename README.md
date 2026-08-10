@@ -16,14 +16,14 @@ SlideSmith is a modern rewrite of the original Python desktop app (DC3 Multimedi
 | Tool | Input | Output |
 | --- | --- | --- |
 | 🎵 **Lyrics → PowerPoint** | Song lyrics (title + labelled stanzas) | `.pptx`, one stanza per slide |
-| 📖 **Sermon → PowerPoint** | Sermon notes `.docx` / references / manual passages | `.pptx` with title slide, pastor info & verses |
+| 📖 **Sermon → PowerPoint** | Sermon notes (`.doc` / `.docx` / `.txt` / `.md` / `.pdf`) / references / manual passages | `.pptx` with title slide, pastor info & verses |
 | 🎵 **Lyrics → ProPresenter 7** | Song lyrics (title + labelled stanzas) | `.pro` file (simple or themed template) |
-| 📖 **Sermon → ProPresenter 7** | Sermon notes `.docx` / references / manual passages | `.pro` file with references & verses |
+| 📖 **Sermon → ProPresenter 7** | Sermon notes (`.doc` / `.docx` / `.txt` / `.md` / `.pdf`) / references / manual passages | `.pro` file with references & verses |
 
 Supporting capabilities:
 
 - **Login-gated UI + API** (blocks anonymous spam / abuse)
-- **Bible verse extraction** from Word documents (`.docx`)
+- **Bible verse extraction** from sermon notes (`.doc`, `.docx`, `.txt`, `.md`, `.pdf`)
 - **Bible passage lookup** — offline (bundled **NKJV** USX data) or online (BibleGateway)
 - **Pastor directory** for sermon title slides / lower-thirds
 - **Slide preview** for lyrics and sermon (PowerPoint & ProPresenter layouts)
@@ -126,7 +126,7 @@ Base path: `/api` (or `/backend-api` via the frontend proxy)
 | `POST` | `/auth/logout` | no* | — | Revoke session + clear cookie |
 | `GET` | `/auth/me` | soft | — | Current user or `401` |
 | `GET` | `/pastors` | yes | — | List configured pastors |
-| `POST` | `/verses/extract` | yes | `multipart` field `document` | Extract Bible references |
+| `POST` | `/verses/extract` | yes | `multipart` field `document` (`.doc` / `.docx` / `.txt` / `.md` / `.pdf`) | Extract Bible references |
 | `POST` | `/passages/lookup` | yes | `{ references[] \| text, source, version }` | Look up passages → slides |
 | `POST` | `/lyrics/validate` | yes | `{ content }` | Validate lyrics format |
 | `POST` | `/lyrics/preview` | yes | `{ content, format, useTheme? }` | Lyrics slide preview JSON |
@@ -199,7 +199,7 @@ The backend applies defense-in-depth:
 - Argon2id password hashing; session tokens hashed (SHA-256) in Postgres
 - Helmet security headers, CORS allowlist, cookie `httpOnly`
 - Global + login-specific rate limiting
-- `zod` request validation, upload size limits, `.docx` magic-number checks
+- `zod` request validation, upload size limits, content sniffing for uploads (`.doc` / `.docx` / `.pdf` / text)
 - Generic client-facing errors (detail logged server-side only)
 
 Change default passwords before any shared or production deployment. Prefer HTTPS and `COOKIE_SECURE=true` when terminating TLS.

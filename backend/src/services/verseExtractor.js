@@ -1,5 +1,13 @@
+import { createRequire } from "node:module";
 import mammoth from "mammoth";
 import { BIBLE_BOOKS, BOOK_MAX_CHAPTERS, BOOK_NAME_MAP } from "../data/bibleBooks.js";
+import { ApiError } from "../utils/ApiError.js";
+
+// CJS packages — load via createRequire for ESM compatibility.
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
+const WordExtractor = require("word-extractor");
+const wordExtractor = new WordExtractor();
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -75,6 +83,76 @@ export function extractVersesFromText(text) {
 export async function extractVersesFromDocx(buffer) {
   const { value } = await mammoth.extractRawText({ buffer });
   return extractVersesFromText(value);
+}
+
+/**
+ * Convert a legacy Word .doc buffer to text, then extract verse references.
+ * @param {Buffer} buffer
+ * @returns {Promise<string[]>}
+ */
+export async function extractVersesFromDoc(buffer) {
+  try {
+    const document = await wordExtractor.extract(buffer);
+    // Convert .doc → plain text, then reuse the shared verse regex.
+    const text = [
+      document.getBody(),
+      document.getHeaders({ includeFooters: true }),
+      document.getFootnotes(),
+      document.getEndnotes(),
+      document.getTextboxes(),
+    ]
+      .filter(Boolean)
+      .join("\n");
+    return extractVersesFromText(text);
+  } catch {
+    throw ApiError.badRequest("Could not read text from that .doc file.");
+  }
+}
+
+/**
+ * Extract Bible verse references from plain text / markdown buffers.
+ * @param {Buffer} buffer
+ * @returns {string[]}
+ */
+export function extractVersesFromPlainTextBuffer(buffer) {
+  const text = buffer.toString("utf8").replace(/^\uFEFF/, "");
+  return extractVersesFromText(text);
+}
+
+/**
+ * Extract Bible verse references from a PDF buffer.
+ * @param {Buffer} buffer
+ * @returns {Promise<string[]>}
+ */
+export async function extractVersesFromPdf(buffer) {
+  try {
+    const result = await pdfParse(buffer);
+    return extractVersesFromText(result?.text ?? "");
+  } catch {
+    throw ApiError.badRequest("Could not read text from that PDF. It may be scanned or encrypted.");
+  }
+}
+
+/**
+ * Extract verses from an uploaded document of a supported kind.
+ * @param {"doc"|"docx"|"txt"|"md"|"pdf"} kind
+ * @param {Buffer} buffer
+ * @returns {Promise<string[]>}
+ */
+export async function extractVersesFromDocument(kind, buffer) {
+  switch (kind) {
+    case "doc":
+      return extractVersesFromDoc(buffer);
+    case "docx":
+      return extractVersesFromDocx(buffer);
+    case "txt":
+    case "md":
+      return extractVersesFromPlainTextBuffer(buffer);
+    case "pdf":
+      return extractVersesFromPdf(buffer);
+    default:
+      throw ApiError.badRequest("Unsupported document type.");
+  }
 }
 
 /**

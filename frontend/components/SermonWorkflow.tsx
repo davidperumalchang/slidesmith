@@ -24,7 +24,7 @@ import {
 } from "@/lib/api";
 import type { Pastor, SermonPreviewResponse, Slide } from "@/lib/types";
 
-type SourceTab = "docx" | "refs" | "manual";
+type SourceTab = "notes" | "refs" | "manual";
 type Msg = { type: "success" | "error" | "info" | "warning"; text: string } | null;
 
 function parseReferences(text: string): string[] {
@@ -55,10 +55,23 @@ function parseManualPassages(text: string): Slide[] {
 }
 
 const TABS: { id: SourceTab; label: string }[] = [
-  { id: "docx", label: "From sermon notes (.docx)" },
+  { id: "notes", label: "From sermon notes" },
   { id: "refs", label: "Enter references" },
   { id: "manual", label: "Enter passages manually" },
 ];
+
+const NOTES_ACCEPT = [
+  ".doc",
+  ".docx",
+  ".txt",
+  ".md",
+  ".pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+  "text/markdown",
+  "application/pdf",
+].join(",");
 
 export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
   const [pastors, setPastors] = useState<Pastor[]>([]);
@@ -66,7 +79,7 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
   const [sermonTitle, setSermonTitle] = useState("");
   const [template, setTemplate] = useState<"simple" | "theme">("simple");
 
-  const [tab, setTab] = useState<SourceTab>("docx");
+  const [tab, setTab] = useState<SourceTab>("notes");
   const [referenceText, setReferenceText] = useState("");
   const [manualText, setManualText] = useState("");
   const [source, setSource] = useState<"offline" | "online">("offline");
@@ -257,15 +270,18 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
           ))}
         </div>
 
-        {tab === "docx" && (
+        {tab === "notes" && (
           <div className="space-y-4">
-            <Field label="Sermon notes" hint="Upload a Word (.docx) document to auto-extract Bible references.">
+            <Field
+              label="Sermon notes"
+              hint="Upload a .doc, .docx, .txt, .md, or .pdf file to auto-extract Bible references."
+            >
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600 transition hover:border-brand-400 hover:bg-brand-50">
                 <UploadIcon className="h-5 w-5 text-slate-400" />
-                <span>{fileName ? fileName : "Choose a .docx file…"}</span>
+                <span>{fileName ? fileName : "Choose a .doc, .docx, .txt, .md, or .pdf file…"}</span>
                 <input
                   type="file"
-                  accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  accept={NOTES_ACCEPT}
                   className="hidden"
                   onChange={(e) => onFileChange(e.target.files?.[0])}
                   disabled={extracting}

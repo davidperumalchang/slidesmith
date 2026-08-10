@@ -2,7 +2,7 @@ import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
 
 import { validateBody } from "../middleware/validate.js";
-import { uploadDocx } from "../middleware/upload.js";
+import { uploadDocument } from "../middleware/upload.js";
 import { requireAuth } from "../middleware/auth.js";
 import {
   lookupSchema,
@@ -54,7 +54,7 @@ router.use(requireAuth);
 
 router.get("/pastors", listPastors);
 
-router.post("/verses/extract", uploadDocx, extractVerses);
+router.post("/verses/extract", uploadDocument, extractVerses);
 router.post("/passages/lookup", validateBody(lookupSchema), lookupPassages);
 
 router.post("/lyrics/validate", validateBody(lyricsContentSchema), validateLyrics);
