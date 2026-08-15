@@ -250,7 +250,7 @@ The API runs its own migrations on startup (`users`, `sessions`) — you do **no
 
 ### 2. Create Fly apps
 
-From the repo root (app names must match `fly.toml` / private DNS, or edit both files):
+From the repo root (app names must match `fly.toml`, or edit both files):
 
 ```bash
 fly auth login
@@ -266,7 +266,7 @@ fly apps create slidesmith-web
 # or: fly launch --no-deploy --name slidesmith-web --region sin
 ```
 
-Use the same org for both apps so `.internal` networking works.
+The web app proxies to the API’s **public** URL (`https://slidesmith-api.fly.dev/api`) so Fly Proxy can wake a scaled-to-zero API machine.
 
 ### 3. Set backend secrets
 
@@ -295,7 +295,7 @@ fly logs
 curl -sS https://slidesmith-api.fly.dev/api/health
 ```
 
-Then deploy the frontend. `API_INTERNAL_URL` is baked at **build** time from `frontend/fly.toml` (`http://slidesmith-api.internal:8080/api`). If you renamed the API app or changed its port, update that build arg before deploying.
+Then deploy the frontend. `API_INTERNAL_URL` is baked at **build** time from `frontend/fly.toml` (`https://slidesmith-api.fly.dev/api`). If you renamed the API app, update that build arg before deploying.
 
 ```bash
 cd ../frontend
@@ -353,7 +353,7 @@ fly ssh console -a slidesmith-api
 ### Notes
 
 - Compose `db` service stays for **local** development only.
-- Backend keeps `min_machines_running = 1` so Fly `.internal` calls work without Flycast auto-start quirks.
+- Both apps use `min_machines_running = 0` and `auto_stop_machines = "stop"` so idle machines stop (low cost for infrequent use). First visit after idle can be slow (UI then API cold start).
 - PPT/PP7 generation is in-memory — API VM is sized at **1GB**; raise memory in `backend/fly.toml` if you hit OOM on large sermons.
 
 ---

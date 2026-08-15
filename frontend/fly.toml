@@ -2,8 +2,9 @@
 #   cd frontend && fly launch --no-deploy   # first time only
 #   fly deploy
 #
-# API_INTERNAL_URL is baked at image build time (Next rewrites). It must point at the
-# Fly private DNS name of the backend app + its internal_port (see backend/fly.toml).
+# API_INTERNAL_URL is baked at image build time (Next rewrites). Use the public
+# API hostname so Fly Proxy can auto-start a scaled-to-zero API machine.
+# Browser still calls same-origin /backend-api/* (session cookie stays on this host).
 
 app = "slidesmith-web"
 primary_region = "sin"
@@ -12,8 +13,8 @@ primary_region = "sin"
   dockerfile = "Dockerfile"
   [build.args]
     NEXT_PUBLIC_API_BASE_URL = "/backend-api"
-    # Must match backend app name + internal_port. Change if you rename the API app.
-    API_INTERNAL_URL = "http://slidesmith-api.internal:8080/api"
+    # Public Fly URL of the API app (must match backend app name + /api path).
+    API_INTERNAL_URL = "https://slidesmith-api.fly.dev/api"
 
 [env]
   NODE_ENV = "production"
@@ -31,7 +32,7 @@ primary_region = "sin"
   [[http_service.checks]]
     interval = "30s"
     timeout = "5s"
-    grace_period = "20s"
+    grace_period = "60s"
     method = "GET"
     # /login is public (middleware redirects / → /login when unauthenticated).
     path = "/login"
