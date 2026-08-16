@@ -2,114 +2,46 @@
 
 import { useEffect, useState } from "react";
 import { SlidePreviewShell } from "@/components/SlidePreviewShell";
+import { PptSlideFrame, PptText, pptBox } from "@/components/PptSlideFrame";
 import type { SermonPreviewResponse, SermonPreviewSlide } from "@/lib/types";
-
-/** Mirrors pptxgenjs fill transparency 20% → 80% opaque black overlay. */
-const PPT_OVERLAY = "rgba(0,0,0,0.8)";
-
-function PptBackground({ backgroundUrl }: { backgroundUrl: string | null }) {
-  if (!backgroundUrl) return null;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={backgroundUrl}
-      alt=""
-      className="absolute inset-0 h-full w-full object-cover"
-    />
-  );
-}
 
 function PptSlideCanvas({
   slide,
   backgroundUrl,
+  framed = true,
 }: {
   slide: SermonPreviewSlide;
   backgroundUrl: string | null;
+  framed?: boolean;
 }) {
   if (slide.kind === "blank") {
-    return (
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-lg ring-1 ring-black/30">
-        <PptBackground backgroundUrl={backgroundUrl} />
-      </div>
-    );
+    return <PptSlideFrame backgroundUrl={backgroundUrl} framed={framed} />;
   }
 
   if (slide.kind === "title") {
     return (
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-lg ring-1 ring-black/30">
-        <PptBackground backgroundUrl={backgroundUrl} />
-        <div className="absolute inset-[6.25%] flex items-center justify-center">
-          <div
-            className="w-full px-[4%] py-[6%] text-center"
-            style={{ backgroundColor: PPT_OVERLAY }}
-          >
-            <p
-              className="font-bold leading-tight text-white"
-              style={{
-                fontFamily: "Arial, Helvetica, sans-serif",
-                fontSize: "clamp(1.35rem, 3.8vw, 2.5rem)",
-              }}
-            >
-              {slide.title}
-            </p>
-            <div className="h-[0.6em]" />
-            <p
-              className="font-bold leading-tight text-white"
-              style={{
-                fontFamily: "Arial, Helvetica, sans-serif",
-                fontSize: "clamp(1.1rem, 3.2vw, 2rem)",
-              }}
-            >
-              {slide.pastorName}
-            </p>
-            <p
-              className="mt-1 font-bold leading-snug text-white"
-              style={{
-                fontFamily: "Arial, Helvetica, sans-serif",
-                fontSize: "clamp(0.85rem, 2.4vw, 1.55rem)",
-              }}
-            >
-              {slide.pastorInfo}
-            </p>
-          </div>
+      <PptSlideFrame backgroundUrl={backgroundUrl} framed={framed}>
+        <div className="flex flex-col items-center justify-center overflow-hidden" style={pptBox(1, 2.5, 14, 4)}>
+          <PptText points={55}>{slide.title}</PptText>
+          <PptText points={20}>&nbsp;</PptText>
+          <PptText points={45}>{slide.pastorName}</PptText>
+          <PptText points={35}>{slide.pastorInfo}</PptText>
         </div>
-      </div>
+      </PptSlideFrame>
     );
   }
 
-  // Verse slide — reference strip + body (ratios from generateSermonPptx).
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-lg ring-1 ring-black/30">
-      <PptBackground backgroundUrl={backgroundUrl} />
-      <div
-        className="absolute left-[3.125%] right-[3.125%] top-[5.55%] flex items-center justify-center px-3"
-        style={{ height: "16.67%", backgroundColor: PPT_OVERLAY }}
-      >
-        <p
-          className="text-center font-bold leading-tight text-white"
-          style={{
-            fontFamily: "Arial, Helvetica, sans-serif",
-            fontSize: "clamp(1.15rem, 3.4vw, 2.2rem)",
-          }}
-        >
-          {slide.reference}
-        </p>
+    <PptSlideFrame backgroundUrl={backgroundUrl} framed={framed}>
+      <div className="flex items-center justify-center overflow-hidden" style={pptBox(0.5, 0.5, 15, 1.5)}>
+        <PptText points={50}>{slide.reference}</PptText>
       </div>
-      <div
-        className="absolute bottom-[11%] left-[3.125%] right-[3.125%] top-[27.8%] overflow-hidden px-[3%] py-[2.5%]"
-        style={{ backgroundColor: PPT_OVERLAY }}
-      >
-        <p
-          className="whitespace-pre-line text-left font-bold leading-snug text-white"
-          style={{
-            fontFamily: "Arial, Helvetica, sans-serif",
-            fontSize: "clamp(1rem, 3vw, 1.95rem)",
-          }}
-        >
+      <div className="flex items-start justify-start overflow-hidden" style={pptBox(0.5, 2.5, 15, 5.5)}>
+        <PptText points={45} align="left" className="whitespace-pre-line">
           {slide.text}
-        </p>
+        </PptText>
       </div>
-    </div>
+    </PptSlideFrame>
   );
 }
 
@@ -283,6 +215,10 @@ export function SermonPreviewModal({
       items={(preview?.slides ?? []).map((s, i) => ({
         label: sermonRailLabel(s, i),
         previewText: sermonRailPreview(s),
+        thumbnail:
+          preview?.format === "ppt" ? (
+            <PptSlideCanvas slide={s} backgroundUrl={preview.backgroundUrl} framed={false} />
+          ) : undefined,
       }))}
       badge={badge}
     >

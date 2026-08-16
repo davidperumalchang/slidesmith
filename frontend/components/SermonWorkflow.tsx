@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Card,
   Field,
@@ -15,14 +15,19 @@ import {
 import { UploadIcon, DownloadIcon, CheckIcon, EyeIcon } from "@/components/icons";
 import { SermonPreviewModal } from "@/components/SermonPreviewModal";
 import {
+  LookupProgressModal,
+  type LookupProgressItem,
+} from "@/components/LookupProgressModal";
+import {
   getPastors,
+  getOfflineBibleVersions,
   extractVerses,
   lookupPassages,
   previewSermon,
   generateSermonPptx,
   generateSermonPp7,
 } from "@/lib/api";
-import type { Pastor, SermonPreviewResponse, Slide } from "@/lib/types";
+import type { BibleVersion, Pastor, SermonPreviewResponse, Slide } from "@/lib/types";
 
 type SourceTab = "notes" | "refs" | "manual";
 type Msg = { type: "success" | "error" | "info" | "warning"; text: string } | null;
@@ -77,13 +82,15 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
   const [pastors, setPastors] = useState<Pastor[]>([]);
   const [pastorId, setPastorId] = useState<string>("");
   const [sermonTitle, setSermonTitle] = useState("");
-  const [template, setTemplate] = useState<"simple" | "theme">("simple");
+  const [template, setTemplate] = useState<"simple" | "theme">("theme");
 
   const [tab, setTab] = useState<SourceTab>("notes");
   const [referenceText, setReferenceText] = useState("");
   const [manualText, setManualText] = useState("");
   const [source, setSource] = useState<"offline" | "online">("offline");
-  const [version, setVersion] = useState("NKJV");
+  const [offlineVersions, setOfflineVersions] = useState<BibleVersion[]>([]);
+  const [offlineVersion, setOfflineVersion] = useState("NKJV");
+  const [onlineVersion, setOnlineVersion] = useState("NKJV");
 
   const [fileName, setFileName] = useState<string>("");
   const [extracting, setExtracting] = useState(false);
@@ -93,6 +100,10 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [preview, setPreview] = useState<SermonPreviewResponse | null>(null);
+
+  const [progressOpen, setProgressOpen] = useState(false);
+  const [progressItems, setProgressItems] = useState<LookupProgressItem[]>([]);
+  const cancelLookupRef = useRef(false);
 
   const [slides, setSlides] = useState<Slide[] | null>(null);
   const [notFound, setNotFound] = useState<string[]>([]);
@@ -105,6 +116,19 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
     getPastors()
       .then(setPastors)
       .catch(() => setPastors([]));
+  }, []);
+
+  useEffect(() => {
+    getOfflineBibleVersions()
+      .then((versions) => {
+        setOfflineVersions(versions);
+        if (versions.length > 0 && !versions.some((v) => v.id === offlineVersion)) {
+          setOfflineVersion(versions[0].id);
+        }
+      })
+      .catch(() => setOfflineVersions([]));
+    // Runs once — the bundled translations cannot change while the page is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const totalVerses = useMemo(
@@ -141,6 +165,70 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
     }
   };
 
+  const updateProgress = (index: number, patch: Partial<LookupProgressItem>) => {
+    setProgressItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  };
+
+  /**
+   * BibleGateway is scraped one passage per request, so a single failure used to
+   * sink the whole batch. Requesting each reference on its own keeps the good
+   * results and shows which references failed.
+   */
+  const lookupOnlineSequentially = async (references: string[]) => {
+    cancelLookupRef.current = false;
+    setProgressItems(references.map((reference) => ({ reference, status: "pending" })));
+    setProgressOpen(true);
+
+    const found: Slide[] = [];
+    const missing: string[] = [];
+
+    for (let i = 0; i < references.length; i += 1) {
+      if (cancelLookupRef.current) {
+        setProgressItems((prev) =>
+          prev.map((item) =>
+            item.status === "pending" ? { ...item, status: "skipped", detail: "Skipped" } : item,
+          ),
+        );
+        break;
+      }
+
+      const reference = references[i];
+      updateProgress(i, { status: "active" });
+
+      try {
+        const res = await lookupPassages({
+          references: [reference],
+          source: "online",
+          version: onlineVersion,
+        });
+
+        if (res.slides.length > 0) {
+          found.push(...res.slides);
+          const verses = res.slides.reduce((sum, s) => sum + s.verses.length, 0);
+          updateProgress(i, {
+            status: "found",
+            detail: `${verses} verse${verses === 1 ? "" : "s"}`,
+          });
+        } else {
+          missing.push(reference);
+          updateProgress(i, { status: "missing", detail: "Not found" });
+        }
+      } catch (e) {
+        missing.push(reference);
+        updateProgress(i, {
+          status: "error",
+          detail: e instanceof Error ? e.message : "Lookup failed",
+        });
+      }
+    }
+
+    setSlides(found.length > 0 ? found : null);
+    setNotFound(missing);
+    if (found.length === 0) {
+      setStep1Msg({ type: "error", text: "No passages could be found for those references." });
+    }
+  };
+
   const onLookup = async () => {
     const references = parseReferences(referenceText);
     if (references.length === 0) {
@@ -151,11 +239,15 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
     resetPassages();
     setLookingUp(true);
     try {
-      const res = await lookupPassages({ references, source, version });
-      setSlides(res.slides);
-      setNotFound(res.notFound);
-      if (res.slides.length === 0) {
-        setStep1Msg({ type: "error", text: "No passages could be found for those references." });
+      if (source === "online") {
+        await lookupOnlineSequentially(references);
+      } else {
+        const res = await lookupPassages({ references, source, version: offlineVersion });
+        setSlides(res.slides);
+        setNotFound(res.notFound);
+        if (res.slides.length === 0) {
+          setStep1Msg({ type: "error", text: "No passages could be found for those references." });
+        }
       }
     } catch (e) {
       setStep1Msg({ type: "error", text: e instanceof Error ? e.message : "Lookup failed." });
@@ -225,17 +317,34 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
             value={source}
             onChange={(v) => setSource(v as "offline" | "online")}
             options={[
-              { value: "offline", label: "Offline (NKJV)" },
+              { value: "offline", label: "Offline" },
               { value: "online", label: "Online (BibleGateway)" },
             ]}
             aria-label="Bible lookup source"
           />
         </Field>
       </div>
-      {source === "online" && (
+      {source === "offline" ? (
+        <div className="w-44">
+          <Field label="Version">
+            <Select
+              value={offlineVersion}
+              onChange={setOfflineVersion}
+              placeholder={offlineVersions.length === 0 ? "Loading…" : "Select version…"}
+              disabled={offlineVersions.length === 0}
+              options={offlineVersions.map((v) => ({ value: v.id, label: v.id }))}
+              aria-label="Offline Bible version"
+            />
+          </Field>
+        </div>
+      ) : (
         <div className="w-32">
           <Field label="Version">
-            <Input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="NKJV" />
+            <Input
+              value={onlineVersion}
+              onChange={(e) => setOnlineVersion(e.target.value)}
+              placeholder="NKJV"
+            />
           </Field>
         </div>
       )}
@@ -261,9 +370,8 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
                 setTab(t.id);
                 setStep1Msg(null);
               }}
-              className={`flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ${
-                tab === t.id ? "bg-white text-brand-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
-              }`}
+              className={`flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ${tab === t.id ? "bg-white text-brand-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                }`}
             >
               {t.label}
             </button>
@@ -445,10 +553,21 @@ export function SermonWorkflow({ outputType }: { outputType: "ppt" | "pp7" }) {
             {outputType === "ppt" ? "Generate PowerPoint" : "Generate .pro file"}
           </Button>
           {(!slides || slides.length === 0) && (
-            <p className="w-full text-xs text-slate-500">Complete step 1 to enable preview and generation.</p>
+            <p className="w-full text-sm text-red-600">Complete step 1 to enable preview and generation.</p>
           )}
         </div>
       </Card>
+
+      <LookupProgressModal
+        open={progressOpen}
+        items={progressItems}
+        running={lookingUp}
+        version={onlineVersion}
+        onCancel={() => {
+          cancelLookupRef.current = true;
+        }}
+        onClose={() => setProgressOpen(false)}
+      />
 
       <SermonPreviewModal
         open={previewOpen}

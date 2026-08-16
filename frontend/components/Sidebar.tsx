@@ -204,9 +204,6 @@ export function Sidebar() {
           <AccountSection />
         </div>
       </aside>
-
-      {/* Spacer for mobile fixed top bar */}
-      <div className="h-14 md:hidden" aria-hidden />
     </>
   );
 }

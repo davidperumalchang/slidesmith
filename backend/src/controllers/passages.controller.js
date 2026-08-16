@@ -1,7 +1,11 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { parseVerseListText } from "../services/verseExtractor.js";
-import { lookupPassagesOffline } from "../services/bibleLookupOffline.js";
+import { lookupPassagesOffline, listOfflineVersions } from "../services/bibleLookupOffline.js";
 import { lookupPassagesOnline } from "../services/bibleGateway.js";
+
+export const listBibleVersions = asyncHandler(async (_req, res) => {
+  res.json({ versions: listOfflineVersions() });
+});
 
 export const lookupPassages = asyncHandler(async (req, res) => {
   const { references, text, source, version } = req.body;
@@ -10,7 +14,7 @@ export const lookupPassages = asyncHandler(async (req, res) => {
   const result =
     source === "online"
       ? await lookupPassagesOnline(refs, version)
-      : lookupPassagesOffline(refs);
+      : lookupPassagesOffline(refs, version);
 
   res.json({
     slides: result.slides,

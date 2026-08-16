@@ -1,5 +1,6 @@
 import type {
   AuthUser,
+  BibleVersion,
   LookupResponse,
   LyricsPreviewResponse,
   Pastor,
@@ -96,6 +97,12 @@ export async function getPastors(): Promise<Pastor[]> {
   const res = await apiFetch("/pastors");
   const data = await json<{ pastors: Pastor[] }>(res);
   return data.pastors;
+}
+
+export async function getOfflineBibleVersions(): Promise<BibleVersion[]> {
+  const res = await apiFetch("/bible/versions");
+  const data = await json<{ versions: BibleVersion[] }>(res);
+  return data.versions;
 }
 
 export async function extractVerses(file: File): Promise<VerseExtractResponse> {

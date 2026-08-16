@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { LYRICS_PPT_BACKGROUND_PATH } from "../config.js";
+import { addPptSlide } from "./pptSlide.js";
 
 // pptxgenjs ships a dual package whose ESM entry is a `.js` file without a
 // `type: module` declaration, which breaks native ESM import on Node < 22.
@@ -82,8 +83,10 @@ export async function generateLyricsPptx(content) {
     const stanzaGroup = lines[0];
     const lyrics = cleanLineEndings(lines.slice(1).join("\n"));
 
-    const slide = pptx.addSlide();
-    slide.background = { path: LYRICS_PPT_BACKGROUND_PATH };
+    const slide = addPptSlide(pptx, LYRICS_PPT_BACKGROUND_PATH, {
+      width: SLIDE_WIDTH,
+      height: SLIDE_HEIGHT,
+    });
 
     // Main lyrics text box (leaves room at the bottom for the stanza label).
     slide.addText(lyrics, {

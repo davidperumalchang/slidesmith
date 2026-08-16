@@ -40,7 +40,7 @@ type Msg = { type: "success" | "error" | "info"; text: string } | null;
 export function LyricsWorkflow() {
   const [output, setOutput] = useState<OutputFormat>("ppt");
   const [content, setContent] = useState(EXAMPLE);
-  const [template, setTemplate] = useState<"simple" | "theme">("simple");
+  const [template, setTemplate] = useState<"simple" | "theme">("theme");
   const [validating, setValidating] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState<Msg>(null);

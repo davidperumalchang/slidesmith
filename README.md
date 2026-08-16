@@ -24,7 +24,7 @@ Supporting capabilities:
 
 - **Login-gated UI + API** (blocks anonymous spam / abuse)
 - **Bible verse extraction** from sermon notes (`.doc`, `.docx`, `.txt`, `.md`, `.pdf`)
-- **Bible passage lookup** — offline (bundled **NKJV** USX data) or online (BibleGateway)
+- **Bible passage lookup** — offline ( **NKJV** USX data, pick the version from a dropdown) or online (BibleGateway)
 - **Pastor directory** for sermon title slides / lower-thirds
 - **Slide preview** for lyrics and sermon (PowerPoint & ProPresenter layouts)
 
@@ -125,6 +125,7 @@ Base path: `/api` (or `/backend-api` via the frontend proxy)
 | `POST` | `/auth/logout` | no* | — | Revoke session + clear cookie |
 | `GET` | `/auth/me` | soft | — | Current user or `401` |
 | `GET` | `/pastors` | yes | — | List configured pastors |
+| `GET` | `/bible/versions` | yes | — | Translations bundled for offline lookup |
 | `POST` | `/verses/extract` | yes | `multipart` field `document` (`.doc` / `.docx` / `.txt` / `.md` / `.pdf`) | Extract Bible references |
 | `POST` | `/passages/lookup` | yes | `{ references[] \| text, source, version }` | Look up passages → slides |
 | `POST` | `/lyrics/validate` | yes | `{ content }` | Validate lyrics format |
@@ -178,7 +179,7 @@ slidesmith/
 │   │   ├── middleware/         # auth, upload, validation, errors
 │   │   └── schemas.js          # zod request schemas
 │   ├── proto/                  # ProPresenter 7 protobuf schema
-│   ├── bible/                  # bundled NKJV USX data
+│   ├── bible/                  # bundled NKJV USX data (add more: bible/<ABBR>/release/USX_1)
 │   ├── assets/                 # backgrounds + .pro templates
 │   └── data/pastors_info.json
 └── frontend/

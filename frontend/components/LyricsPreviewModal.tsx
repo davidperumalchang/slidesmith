@@ -2,62 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { SlidePreviewShell } from "@/components/SlidePreviewShell";
+import { PptSlideFrame, PptText, pptBox } from "@/components/PptSlideFrame";
 import type { LyricsPreviewResponse, LyricsPreviewSlide } from "@/lib/types";
-
-/** Mirrors pptxgenjs fill transparency 20% → 80% opaque black overlay. */
-const PPT_OVERLAY = "rgba(0,0,0,0.8)";
 
 function PptSlideCanvas({
   slide,
   backgroundUrl,
+  framed = true,
 }: {
   slide: LyricsPreviewSlide;
   backgroundUrl: string | null;
+  framed?: boolean;
 }) {
-  // Layout ratios match generateLyricsPptx: label strip = 0.4" of 9" ≈ 4.44%.
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-lg ring-1 ring-black/30">
-      {backgroundUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={backgroundUrl}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      )}
-
-      {/* Main lyrics text box — full width, leaves room for bottom label */}
-      <div
-        className="absolute inset-x-0 top-0 flex items-center justify-center px-[4%] py-[3%]"
-        style={{ bottom: "4.44%", backgroundColor: PPT_OVERLAY }}
-      >
-        <p
-          className="whitespace-pre-line text-center font-bold leading-[1.25] text-white"
-          style={{
-            fontFamily: "Arial, Helvetica, sans-serif",
-            fontSize: "clamp(1.15rem, 3.6vw, 2.35rem)",
-          }}
-        >
+    <PptSlideFrame backgroundUrl={backgroundUrl} framed={framed}>
+      <div className="flex items-center justify-center" style={pptBox(0, 0, 16, 8.6)}>
+        <PptText points={50} className="whitespace-pre-line">
           {slide.lines.join("\n")}
-        </p>
+        </PptText>
       </div>
-
-      {/* Stanza group label strip */}
-      <div
-        className="absolute inset-x-0 bottom-0 flex items-center justify-center px-3"
-        style={{ height: "4.44%", backgroundColor: PPT_OVERLAY }}
-      >
-        <p
-          className="truncate font-bold text-white"
-          style={{
-            fontFamily: "Arial, Helvetica, sans-serif",
-            fontSize: "clamp(0.55rem, 1.1vw, 0.75rem)",
-          }}
-        >
+      <div className="flex items-center justify-center" style={pptBox(0, 8.6, 16, 0.4)}>
+        <PptText points={12} className="truncate">
           {slide.label}
-        </p>
+        </PptText>
       </div>
-    </div>
+    </PptSlideFrame>
   );
 }
 
@@ -200,6 +169,10 @@ export function LyricsPreviewModal({
       items={(preview?.slides ?? []).map((s, i) => ({
         label: lyricsRailLabel(s, i),
         previewText: s.text || s.label || `Slide ${i + 1}`,
+        thumbnail:
+          preview?.format === "ppt" ? (
+            <PptSlideCanvas slide={s} backgroundUrl={preview.backgroundUrl} framed={false} />
+          ) : undefined,
       }))}
       badge={badge}
     >

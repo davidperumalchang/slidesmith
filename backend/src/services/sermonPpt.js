@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { SERMON_PPT_BACKGROUND_PATH } from "../config.js";
+import { addPptSlide } from "./pptSlide.js";
 
 // See lyricsPpt.js: load pptxgenjs' CommonJS build for cross-Node ESM support.
 const require = createRequire(import.meta.url);
@@ -25,8 +26,10 @@ function darkFill() {
 }
 
 function addTitleSlide(pptx, pastor, sermonTitle) {
-  const slide = pptx.addSlide();
-  slide.background = { path: SERMON_PPT_BACKGROUND_PATH };
+  const slide = addPptSlide(pptx, SERMON_PPT_BACKGROUND_PATH, {
+    width: SLIDE_WIDTH,
+    height: SLIDE_HEIGHT,
+  });
 
   const titleText = sermonTitle && sermonTitle.trim() ? sermonTitle.trim() : "[Insert sermon title]";
   const nameText = pastor ? pastor.name : "[Pastor Name]";
@@ -55,13 +58,17 @@ function addTitleSlide(pptx, pastor, sermonTitle) {
 }
 
 function addEmptySlide(pptx) {
-  const slide = pptx.addSlide();
-  slide.background = { path: SERMON_PPT_BACKGROUND_PATH };
+  addPptSlide(pptx, SERMON_PPT_BACKGROUND_PATH, {
+    width: SLIDE_WIDTH,
+    height: SLIDE_HEIGHT,
+  });
 }
 
 function addVerseSlide(pptx, referenceTitle, verseContent) {
-  const slide = pptx.addSlide();
-  slide.background = { path: SERMON_PPT_BACKGROUND_PATH };
+  const slide = addPptSlide(pptx, SERMON_PPT_BACKGROUND_PATH, {
+    width: SLIDE_WIDTH,
+    height: SLIDE_HEIGHT,
+  });
 
   slide.addText(referenceTitle, {
     x: 0.5,

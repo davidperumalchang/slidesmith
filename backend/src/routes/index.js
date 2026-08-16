@@ -18,7 +18,7 @@ import {
 import { login, logout, me } from "../controllers/auth.controller.js";
 import { listPastors } from "../controllers/pastors.controller.js";
 import { extractVerses } from "../controllers/verses.controller.js";
-import { lookupPassages } from "../controllers/passages.controller.js";
+import { lookupPassages, listBibleVersions } from "../controllers/passages.controller.js";
 import {
   validateLyrics,
   previewLyricsSlides,
@@ -53,6 +53,8 @@ router.post("/auth/logout", logout);
 router.use(requireAuth);
 
 router.get("/pastors", listPastors);
+
+router.get("/bible/versions", listBibleVersions);
 
 router.post("/verses/extract", uploadDocument, extractVerses);
 router.post("/passages/lookup", validateBody(lookupSchema), lookupPassages);

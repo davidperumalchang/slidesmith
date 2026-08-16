@@ -1,26 +1,108 @@
 import fs from "node:fs";
 import path from "node:path";
-import { BIBLE_USX_DIR } from "../config.js";
+import { BIBLE_DIR, BIBLE_USX_DIR, DEFAULT_BIBLE_VERSION } from "../config.js";
 import { BOOK_CODES } from "../data/bibleBooks.js";
 import { sanitizeText } from "../utils/text.js";
 import { ApiError } from "../utils/ApiError.js";
 
-// code (e.g. "GEN") -> absolute path to its USX file. Built once at load.
-const BOOK_MAP = (() => {
+function isDirectory(dir) {
+  try {
+    return fs.statSync(dir).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** Pull the abbreviation/name out of a DBL `metadata.xml` bundle descriptor. */
+function readBundleMetadata(bundleDir) {
+  try {
+    const xml = fs.readFileSync(path.join(bundleDir, "metadata.xml"), "utf-8");
+    const identification = xml.match(/<identification>([\s\S]*?)<\/identification>/)?.[1] ?? "";
+    return {
+      abbreviation: identification.match(/<abbreviation>([^<]+)<\/abbreviation>/)?.[1]?.trim(),
+      name: identification.match(/<name>([^<]+)<\/name>/)?.[1]?.trim(),
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Bundled translations, keyed by uppercased abbreviation. The original single
+ * bundle lives at `bible/release/USX_1`; additional translations are picked up
+ * from `bible/<ABBREVIATION>/release/USX_1`.
+ */
+const VERSIONS = (() => {
+  const versions = new Map();
+
+  const add = (fallbackId, bundleDir, usxDir) => {
+    const meta = readBundleMetadata(bundleDir);
+    const id = (meta.abbreviation || fallbackId).toUpperCase();
+    if (!id || versions.has(id)) return;
+    versions.set(id, { id, name: meta.name || id, usxDir, bookMap: null });
+  };
+
+  if (isDirectory(BIBLE_USX_DIR)) {
+    add(DEFAULT_BIBLE_VERSION, BIBLE_DIR, BIBLE_USX_DIR);
+  }
+
+  let entries = [];
+  try {
+    entries = fs.readdirSync(BIBLE_DIR, { withFileTypes: true });
+  } catch {
+    entries = [];
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name === "release") continue;
+    const bundleDir = path.join(BIBLE_DIR, entry.name);
+    const usxDir = path.join(bundleDir, "release", "USX_1");
+    if (isDirectory(usxDir)) add(entry.name, bundleDir, usxDir);
+  }
+
+  return versions;
+})();
+
+/** code (e.g. "GEN") -> absolute path of its USX file, built on first use. */
+function bookMapFor(version) {
+  if (version.bookMap) return version.bookMap;
+
   const map = {};
   let files = [];
   try {
-    files = fs.readdirSync(BIBLE_USX_DIR);
+    files = fs.readdirSync(version.usxDir);
   } catch {
     files = [];
   }
   for (const file of files) {
     if (file.toLowerCase().endsWith(".usx")) {
-      map[file.slice(0, -4)] = path.join(BIBLE_USX_DIR, file);
+      map[file.slice(0, -4)] = path.join(version.usxDir, file);
     }
   }
+  version.bookMap = map;
   return map;
-})();
+}
+
+/**
+ * Translations available for offline lookup.
+ * @returns {Array<{id:string, name:string}>}
+ */
+export function listOfflineVersions() {
+  return [...VERSIONS.values()]
+    .map(({ id, name }) => ({ id, name }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * Resolve a requested version against the bundled allowlist (never a path).
+ * @param {string} [version]
+ */
+function resolveVersion(version) {
+  const requested = String(version ?? "").trim().toUpperCase();
+  if (!requested) {
+    return VERSIONS.get(DEFAULT_BIBLE_VERSION) ?? [...VERSIONS.values()][0] ?? null;
+  }
+  return VERSIONS.get(requested) ?? null;
+}
 
 const usxCache = new Map();
 
@@ -66,11 +148,12 @@ function extractVerseText(rawVerse) {
 
 /**
  * Look up verses for a single reference from the bundled USX files.
+ * @param {Record<string,string>} bookMap book code -> USX file path
  * @returns {{reference:string, verseTexts:Map<number,string>}|null}
  */
-export function lookupVerse(bookName, bookCode, chapter, startVerse, endVerse) {
-  if (!bookCode || !BOOK_MAP[bookCode]) return null;
-  const content = readUsx(BOOK_MAP[bookCode]);
+export function lookupVerse(bookMap, bookName, bookCode, chapter, startVerse, endVerse) {
+  if (!bookCode || !bookMap[bookCode]) return null;
+  const content = readUsx(bookMap[bookCode]);
 
   const chapterMatch = content.match(new RegExp(`<chapter number="${chapter}"[^>]*>`));
   if (!chapterMatch) return null;
@@ -111,12 +194,19 @@ function passageToSlide(passage) {
 /**
  * Look up a list of references offline and return the slides document.
  * @param {string[]} references
- * @returns {{slides: Array<{title:string, verses:Array<{content:string}>}>, notFound: string[]}}
+ * @param {string} [version] bundled translation abbreviation (e.g. "NKJV")
+ * @returns {{slides: Array<{title:string, verses:Array<{content:string}>}>, notFound: string[], version: string}}
  */
-export function lookupPassagesOffline(references) {
+export function lookupPassagesOffline(references, version) {
   if (!Array.isArray(references) || references.length === 0) {
     throw ApiError.badRequest("No verse references provided.");
   }
+
+  const resolved = resolveVersion(version);
+  if (!resolved) {
+    throw ApiError.badRequest("That Bible version is not available offline.");
+  }
+  const bookMap = bookMapFor(resolved);
 
   const slides = [];
   const notFound = [];
@@ -132,6 +222,7 @@ export function lookupPassagesOffline(references) {
     }
 
     const passage = lookupVerse(
+      bookMap,
       parsed.bookName,
       parsed.bookCode,
       parsed.chapter,
@@ -146,5 +237,5 @@ export function lookupPassagesOffline(references) {
     }
   }
 
-  return { slides, notFound };
+  return { slides, notFound, version: resolved.id };
 }

@@ -12,6 +12,7 @@ import {
 export type SlideRailItem = {
   label: string;
   previewText: string;
+  thumbnail?: ReactNode;
 };
 
 export function SlidePreviewShell({
@@ -168,19 +169,25 @@ export function SlidePreviewShell({
                                 {i + 1}
                               </span>
                               <span className="min-w-0 flex-1">
-                                <span
-                                  className={`block aspect-video w-full overflow-hidden rounded border bg-black shadow-sm ${
-                                    active
-                                      ? "border-brand-500 ring-2 ring-brand-500/30"
-                                      : "border-slate-300 group-hover:border-slate-400"
-                                  }`}
-                                >
+                              <span
+                                className={`relative block aspect-video w-full overflow-hidden rounded border bg-black shadow-sm ${
+                                  active
+                                    ? "border-brand-500 ring-2 ring-brand-500/30"
+                                    : "border-slate-300 group-hover:border-slate-400"
+                                }`}
+                              >
+                                {item.thumbnail ? (
+                                  <span className="pointer-events-none absolute inset-0 block">
+                                    {item.thumbnail}
+                                  </span>
+                                ) : (
                                   <span className="flex h-full flex-col items-center justify-center gap-0.5 px-1.5 py-1">
                                     <span className="line-clamp-3 w-full whitespace-pre-line text-center text-[8px] font-medium leading-tight text-white sm:text-[9px]">
                                       {item.previewText || " "}
                                     </span>
                                   </span>
-                                </span>
+                                )}
+                              </span>
                                 <span
                                   className={`mt-1 block truncate text-[10px] font-medium sm:text-[11px] ${
                                     active ? "text-brand-700" : "text-slate-500"

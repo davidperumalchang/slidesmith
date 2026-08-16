@@ -13,6 +13,12 @@ export type Pastor = {
 
 export type Verse = { content: string };
 
+/** A translation bundled for offline lookup. */
+export type BibleVersion = {
+  id: string;
+  name: string;
+};
+
 export type Slide = {
   title: string;
   verses: Verse[];
